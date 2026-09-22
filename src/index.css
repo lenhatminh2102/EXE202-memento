@@ -1,0 +1,12 @@
+@import '../.design-source/src/styles/index.css';
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+}
