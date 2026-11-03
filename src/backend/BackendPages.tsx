@@ -6,6 +6,8 @@ import { checkedUpdate, errorMessage, supabase, unwrap } from './supabase'
 import { statusLabels } from './model'
 import * as booking from './bookings'
 import { Captcha, captchaEnabled } from './Captcha'
+import { AnalyticsPanel } from './AnalyticsPanel';
+import { trackConversion } from './analytics';
 import { useTableVersion } from './useTableVersion'
 
 const inputClass = 'w-full border border-border rounded-xl px-4 py-3 text-sm bg-secondary/40 outline-none focus:border-primary'
@@ -43,8 +45,9 @@ export function RegisterForm({ onDone }: { onDone: () => void }) {
       const password = String(f.get('password'))
       if (captchaEnabled && !captchaToken) throw new Error('Vui lòng hoàn tất CAPTCHA.')
       if (password.length < 8) throw new Error('Mật khẩu cần ít nhất 8 ký tự.')
-      unwrap(await supabase.auth.signUp({ email: String(f.get('email')).trim(), password,
+      const signup = unwrap(await supabase.auth.signUp({ email: String(f.get('email')).trim(), password,
         options: { captchaToken: captchaToken || undefined, emailRedirectTo: window.location.origin, data: { full_name: String(f.get('name')), phone: String(f.get('phone')) } } }))
+      if (signup.user && signup.user.identities?.length) trackConversion('sign_up', { method: 'email' });
       setCaptchaToken(null); setReset(n => n + 1)
     }, 'Đã gửi yêu cầu đăng ký. Kiểm tra email xác nhận trước khi đăng nhập.')
   }}>
@@ -421,7 +424,7 @@ export function Dashboard({ admin = false }: { admin?: boolean }) {
   const completed = bookings.filter(b => b.status === 'completed')
   const total = completed.reduce((s, b) => s + Number(b.package_price || 0), 0)
   const items = admin ? [['Người dùng', users.length], ['Nhiếp ảnh gia', photographers.length], ['Đơn đặt lịch', bookings.length], ['Chờ duyệt', applications.filter(a => a.status === 'pending').length]] : [['Đơn đặt lịch', bookings.length], ['Chờ xác nhận', bookings.filter(b => b.status === 'pending').length], ['Hoàn thành', completed.length], [user?.role === 'photographer' ? 'Giá trị đơn hoàn thành' : 'Tổng giá trị đơn hoàn thành', money(total)]]
-  return <Panel title={`Xin chào, ${user?.name || 'bạn'}`}><div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{items.map(([label, value]) => <div key={label} className="bg-card border border-border rounded-2xl p-5"><p className="text-sm text-muted-foreground">{label}</p><p className="text-2xl text-primary font-bold mt-2">{value}</p></div>)}</div><div className="bg-card border border-border rounded-2xl p-5"><h2 className="font-bold mb-3">Đặt lịch gần đây</h2>{!bookings.length && <p className="text-sm text-muted-foreground">Chưa có đặt lịch.</p>}{bookings.slice(0, 6).map(b => <div key={b.id} className="flex justify-between gap-3 py-3 border-b border-border last:border-0 text-sm"><span>{b.photographer_name} · {date(b.booking_date)}</span><span>{statusLabels[b.status] || b.status}</span></div>)}</div></Panel>
+  return <Panel title={`Xin chào, ${user?.name || 'bạn'}`}>{admin && <AnalyticsPanel />}<div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{items.map(([label, value]) => <div key={label} className="bg-card border border-border rounded-2xl p-5"><p className="text-sm text-muted-foreground">{label}</p><p className="text-2xl text-primary font-bold mt-2">{value}</p></div>)}</div><div className="bg-card border border-border rounded-2xl p-5"><h2 className="font-bold mb-3">Đặt lịch gần đây</h2>{!bookings.length && <p className="text-sm text-muted-foreground">Chưa có đặt lịch.</p>}{bookings.slice(0, 6).map(b => <div key={b.id} className="flex justify-between gap-3 py-3 border-b border-border last:border-0 text-sm"><span>{b.photographer_name} · {date(b.booking_date)}</span><span>{statusLabels[b.status] || b.status}</span></div>)}</div></Panel>
 }
 
 export function Unsupported({ title }: { title: string }) {

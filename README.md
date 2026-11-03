@@ -61,3 +61,40 @@ Kiểm thử thủ công: đăng nhập qua CAPTCHA → kiểm tra role → tìm
 FE gọi Supabase qua VITE_SUPABASE_URL trong .env.local. Danh mục và số lượng thợ được tính từ hồ sơ trả về; đánh giá, avatar và thống kê lấy từ database. Không dùng lịch trống giả hoặc thay thế hồ sơ không tồn tại bằng thợ đầu tiên. Khi API lỗi, hiển thị lỗi; khi database rỗng, hiển thị trạng thái trống. Ảnh trang trí và nhãn giao diện là tài nguyên UI, không phải dữ liệu nghiệp vụ mẫu.
 
 Subscriptions theo dõi photographers, photographer_reviews, bookings, notifications, pinned_photographers và các bảng quản trị phù hợp vai trò. Các bảng cần được bật trong publication Realtime phía Supabase để đẩy thay đổi ngay. FE cũng đồng bộ lại mỗi 30 giây khi tab đang hiển thị, và khi quay lại tab.
+
+## Google Analytics: biểu đồ Memento, không cần đăng nhập Google trên FE
+
+Dashboard và Cài đặt Analytics đọc dữ liệu qua GET /api/analytics. Không dùng iframe Looker Studio. Người dùng chỉ cần phiên Supabase có role admin đang hoạt động. Backend xác thực token bằng Supabase Auth và đọc role từ profiles trước mỗi lần trả báo cáo, kể cả cache.
+
+Báo cáo gồm: tổng người dùng, người dùng hoạt động/mới, phiên, lượt xem, sự kiện, biểu đồ theo ngày và các bảng nguồn truy cập, thiết bị/hệ điều hành, quốc gia, sự kiện. Chọn 7/30/90 ngày và tất cả nền tảng hoặc chỉ web/Android/iOS. Tất cả nền tảng bao gồm dữ liệu app cũ. Không dùng số liệu demo; lỗi API được hiển thị và dữ liệu rỗng có trạng thái riêng. Đây không phải số người online realtime.
+
+### Backend local
+
+Trong .env.local (được Git bỏ qua), cấu hình:
+
+- GA4_PROPERTY_ID: ID số của property GA4.
+- GOOGLE_APPLICATION_CREDENTIALS: đường dẫn tuyệt đối tới JSON Service Account nằm ngoài repo.
+- VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY: public configuration dùng xác thực admin.
+
+Chạy npm run dev. Vite có middleware backend tại /api/analytics. Không dùng vite preview để test API này vì preview chỉ phục vụ file build tĩnh. Cần khởi động lại Vite khi cập nhật cấu hình backend.
+
+Backend dùng OAuth scope analytics.readonly, ký JWT bằng private key ở server. Không chuyển private key, Google access token hay JSON credentials cho trình duyệt. Báo cáo cache trong bộ nhớ tối đa 60 giây; FE tự đồng bộ lại mỗi 60 giây khi tab đang hiển thị. Cache không thay thế bước kiểm tra admin. Các bảng phân nhóm chỉ lấy 20 hàng đầu; người dùng có thể xuất hiện trong nhiều nhóm nên không cộng các hàng để suy ra tổng.
+
+### Khi deploy Vercel (chưa thực hiện)
+
+Deploy cả api/analytics.mjs và server/ cùng FE. Đặt các biến sau trong Vercel backend environment:
+
+- GA4_PROPERTY_ID.
+- GOOGLE_SERVICE_ACCOUNT_JSON: toàn bộ JSON Service Account trong biến môi trường riêng, KHÔNG có tiền tố VITE_. Không upload file vào public/ hoặc commit Git.
+- VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY, hoặc SUPABASE_URL và SUPABASE_ANON_KEY tương ứng cho backend.
+- VITE_GA_MEASUREMENT_ID: public ID G-... để FE gửi dữ liệu website.
+
+Service Account cần quyền Viewer trong đúng property, và Google Analytics Data API phải bật trong Google Cloud project. Không cấp role Owner Google Cloud chỉ để đọc Analytics. Chưa cần thay đổi SQL/database để đọc báo cáo GA4.
+
+### Tracking website
+
+Giữ VITE_GA_MEASUREMENT_ID cho luồng Web. Tracking local mặc định tắt; VITE_GA_ENABLED_IN_DEV=true chỉ dùng khi chủ động kiểm thử. Các page_view được gửi thủ công cho điều hướng React state với send_page_view=false. Sự kiện booking_created chỉ gửi sau khi server tạo đơn thành công; sign_up chỉ gửi khi phản hồi tạo tài khoản hợp lệ. Chuyển đổi phát sinh ở màn riêng tư được giữ trong bộ nhớ và gửi khi quay về màn được phép; mất khi tải lại trang. Chưa ghi nhận purchase vì không có bằng chứng thanh toán ở sự kiện bấm nút.
+
+Không gửi email, điện thoại, ID Supabase, token, ghi chú đơn hay dữ liệu ngân hàng. Các màn riêng tư và admin tắt thu thập bằng cờ ga-disable. Chủ website kiểm tra chính sách/consent và Enhanced Measurement trong GA4 trước khi bật production; không bật thêm automatic pageviews theo history để tránh đếm trùng. Tài liệu: https://developers.google.com/analytics/devguides/collection/ga4/views
+
+Kiểm tra: npm run typecheck, npm test, npm run lint, npm run build. Các bài test API dùng credentials RSA sinh trong bộ nhớ và transport giả, không gọi Google hay ghi dữ liệu thật.

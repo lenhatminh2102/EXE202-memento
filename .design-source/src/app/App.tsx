@@ -1,3 +1,5 @@
+import { useAnalyticsPage, trackConversion } from '../../../src/backend/analytics';
+import { AnalyticsSettingsPage } from '../../../src/backend/AnalyticsPanel';
 import React, { useState, useEffect } from "react";
 import { useTableVersion } from '../../../src/backend/useTableVersion';
 import heroImage from '../../../src/assets/hero.png';
@@ -389,7 +391,7 @@ function Footer({ navigate }: { navigate: Navigate }) {
     { title: 'Tài khoản', items: [['Đăng nhập', 'login'], ['Đăng ký', 'register'], ['Hồ sơ', 'client-profile']] },
     { title: 'Đặt lịch', items: [['Đặt lịch của tôi', 'history'], ['Yêu thích', 'favorites'], ['Tin nhắn', 'messages']] },
   ];
-  return <footer className="bg-foreground text-white mt-20"><div className="max-w-7xl mx-auto px-6 py-14"><div className="grid md:grid-cols-4 gap-10 mb-10"><div><p className="font-bold text-xl mb-4">Memento</p><p className="text-sm text-white/60">Where Moments Become Memories. Kết nối những khoảnh khắc đáng nhớ.</p></div>{links.map(col => <div key={col.title}><h4 className="font-semibold text-sm mb-4">{col.title}</h4><ul className="space-y-2.5">{col.items.map(([label, view]) => <li key={view}><button onClick={() => navigate(view)} className="text-sm text-white/60 hover:text-white">{label}</button></li>)}</ul></div>)}</div><p className="text-xs text-white/40 border-t border-white/10 pt-6">© {new Date().getFullYear()} Memento.</p></div></footer>;
+  return <footer className="bg-foreground text-white mt-20"><div className="max-w-7xl mx-auto px-6 py-14"><div className="grid md:grid-cols-4 gap-10 mb-10"><div><p className="font-bold text-xl mb-4">Memento</p><p className="text-sm text-white/60">Where Moments Become Memories. Kết nối những khoảnh khắc đáng nhớ.</p><a href="https://github.com/lenhatminh2102/App-Memento/releases/download/android-build-8/memento.apk" className="mt-4 inline-block text-sm font-semibold text-white underline underline-offset-4">Tải về APK</a></div>{links.map(col => <div key={col.title}><h4 className="font-semibold text-sm mb-4">{col.title}</h4><ul className="space-y-2.5">{col.items.map(([label, view]) => <li key={view}><button onClick={() => navigate(view)} className="text-sm text-white/60 hover:text-white">{label}</button></li>)}</ul></div>)}</div><p className="text-xs text-white/40 border-t border-white/10 pt-6">© {new Date().getFullYear()} Memento.</p></div></footer>;
 }
 
 
@@ -1111,6 +1113,7 @@ function BookingPage({ navigate, photographerId, packageId }: { navigate: Naviga
         client_note: ['Liên hệ: ' + contactName.trim() + ' · ' + phone.trim(), 'Địa điểm: ' + location.trim(), note.trim()].filter(Boolean).join('\n'),
       }));
       if (result.error || !result.data) throw new Error(result.error || 'Máy chủ chưa lưu đặt lịch.');
+      trackConversion('booking_created', { value: Number(result.data.package_price), currency: 'VND' });
       navigate('booking-success', { bookingId: result.data.id });
     } catch(e) { setError(errorMessage(e)); } finally { setBusy(false); }
   };
@@ -1477,7 +1480,10 @@ function AdminPhotographersPage({ navigate }: { navigate: Navigate }) {
 export default function App() {
   const backend = useBackend();
   const { user: authUser, authLoading, login, logout, photographers, recovery } = backend;
-  const [view, setView] = useState<View>('home');
+  const [view, setView] = useState<View>(() => {
+    const requested = new URLSearchParams(window.location.search).get('view');
+    return requested === 'admin-settings' || requested === 'admin-dashboard' ? requested : 'home';
+  });
   const [params, setParams] = useState<Record<string, unknown>>({});
   const navigate: Navigate = (v, p = {}) => { setView(v); setParams(p); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const role: Role = authUser?.role ?? 'public';
@@ -1485,6 +1491,7 @@ export default function App() {
   const mustLogin = ALL_PROTECTED.includes(view) && !authUser;
   const wrongRole = (ADMIN_ROUTES.includes(view) && role !== 'admin') || (PHOTO_ROUTES.includes(view) && role !== 'photographer');
   const activeView = mustLogin ? 'login' : wrongRole ? dashboard : view;
+  useAnalyticsPage(activeView, role, !authLoading && !recovery);
   useEffect(() => { if (authUser && view === 'login') { setView(dashboard); setParams({}); } }, [authUser?.id, view, dashboard]);
   const signOut = () => { void logout().then(() => navigate('home')).catch(e => window.alert(errorMessage(e))); };
   const chosen = photographers.find(p => p.id === Number(params.id ?? params.photographerId));
@@ -1520,7 +1527,7 @@ export default function App() {
       case 'admin-reviews': return <Panel title="Quản lý đánh giá"><ReviewsPanel admin /></Panel>;
       case 'admin-reports': return <RevenuePage navigate={navigate} />;
       case 'admin-categories': return <BackendCategories />;
-      case 'admin-settings': return <Unsupported title="Cài đặt hệ thống" />;
+      case 'admin-settings': return <AnalyticsSettingsPage />;
       case 'about': return <Panel title="Về Memento"><p>Nền tảng kết nối khách hàng với nhiếp ảnh gia.</p></Panel>;
       case 'contact': return <Panel title="Liên hệ"><p>Đăng nhập và mở cuộc trò chuyện từ đặt lịch để trao đổi với nhiếp ảnh gia.</p></Panel>;
       default: return <HomePage navigate={navigate} />;
