@@ -426,7 +426,7 @@ function HomePage({ navigate }: { navigate: Navigate }) {
   return (
     <div>
       {/* Hero */}
-      <section className="relative h-[88vh] overflow-hidden">
+      <section className="relative overflow-hidden bg-foreground">
         <img
           src={heroImage}
           alt="Photography hero"
@@ -434,59 +434,50 @@ function HomePage({ navigate }: { navigate: Navigate }) {
         />
         <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(10,30,30,0.6) 0%, rgba(10,30,30,0.5) 50%, rgba(10,30,30,0.75) 100%)" }} />
 
-        <div className="relative z-10 h-full flex flex-col items-center justify-center text-center text-white px-4">
+        <div className="relative z-10 flex flex-col items-center justify-center text-center text-white px-5 py-14 md:py-24">
           <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-1.5 text-sm font-medium mb-6">
             <Sparkles className="w-3.5 h-3.5" style={{ color: "#7EE6D8" }} />
             <span>Kết nối nhiếp ảnh gia Việt Nam</span>
           </div>
 
           <h1 className="text-4xl md:text-6xl font-bold mb-4 leading-tight max-w-3xl">
-            Khoảnh Khắc Đáng Nhớ<br />
-            <span style={{ color: "#7EE6D8" }}>Bắt Đầu Từ Đây</span>
+            Tìm nhiếp ảnh gia
+            <span style={{ color: "#7EE6D8" }}>cho dịp của bạn</span>
           </h1>
-          <p className="text-lg text-white/80 mb-10 max-w-xl font-light">
-            Kết nối với nhiếp ảnh gia chuyên nghiệp. Đặt lịch dễ dàng, an toàn và nhanh chóng.
+          <p className="text-base text-white/90 mb-6 max-w-xl font-light">
+            Chọn địa điểm và thể loại chụp để tìm người phù hợp.
           </p>
 
           {/* Search bar */}
-          <div className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl p-2 flex flex-col sm:flex-row gap-2">
+          <form onSubmit={(event) => { event.preventDefault(); navigate("search", { location: search, specialty }); }} className="w-full max-w-2xl bg-white rounded-2xl shadow-2xl p-2 flex flex-col sm:flex-row gap-2">
             <div className="flex-1 flex items-center gap-3 px-4 py-2">
               <MapPin className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Thành phố hoặc địa điểm..."
+                aria-label="Địa điểm chụp" placeholder="Thành phố hoặc địa điểm"
                 className="flex-1 text-sm text-foreground placeholder-muted-foreground outline-none bg-transparent"
               />
             </div>
             <div className="flex items-center gap-3 px-4 py-2 border-t sm:border-t-0 sm:border-l border-border">
               <Camera className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
-              <select value={specialty} onChange={(e) => setSpecialty(e.target.value)} className="flex-1 text-sm text-foreground outline-none bg-transparent cursor-pointer">
+              <select aria-label="Thể loại chụp" value={specialty} onChange={(e) => setSpecialty(e.target.value)} className="flex-1 text-sm text-foreground outline-none bg-transparent cursor-pointer">
                 <option>Tất cả</option>
                 {categories.map(c => <option key={c.label}>{c.label}</option>)}
               </select>
             </div>
             <button
-              onClick={() => navigate("search", { location: search, specialty })}
+              type="submit"
               className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-white font-semibold transition-opacity hover:opacity-90 text-sm"
               style={{ backgroundColor: "#0F6D6A" }}
             >
-              <Search className="w-4 h-4" /> Tìm kiếm
+              <Search className="w-4 h-4" /> Tìm nhiếp ảnh gia
             </button>
-          </div>
-
-          {/* Quick tags */}
-          <div className="flex flex-wrap justify-center gap-2 mt-5">
-            {categories.slice(0, 4).map(c => c.label).map((t) => (
-              <button key={t} onClick={() => navigate("search", { specialty: t })} className="px-3 py-1 rounded-full text-xs font-medium text-white/80 border border-white/20 hover:border-white/60 hover:text-white transition-colors">
-                {t}
-              </button>
-            ))}
-          </div>
+          </form>
         </div>
 
         {/* Stats bar */}
-        <div className="absolute bottom-0 left-0 right-0 bg-white/10 backdrop-blur-md border-t border-white/10">
+        <div className="relative bg-black/25 border-t border-white/10">
           <div className="max-w-5xl mx-auto px-6 py-4 grid grid-cols-3 gap-4">
             {[
               { value: String(PHOTOGRAPHERS.length), label: "Nhiếp ảnh gia" },
@@ -552,7 +543,7 @@ function HomePage({ navigate }: { navigate: Navigate }) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
           <div className="hidden md:block absolute top-12 left-1/3 right-1/3 h-px" style={{ backgroundColor: "#7EE6D8" }} />
           {[
-            { step: "01", icon: Search, title: "Tìm kiếm", desc: "Lọc theo địa điểm, phong cách và ngân sách để tìm nhiếp ảnh gia phù hợp nhất với bạn." },
+            { step: "01", icon: Search, title: "Tìm nhiếp ảnh gia", desc: "Lọc theo địa điểm, phong cách và ngân sách để tìm nhiếp ảnh gia phù hợp nhất với bạn." },
             { step: "02", icon: Calendar, title: "Đặt lịch", desc: "Chọn gói dịch vụ, ngày giờ và điền thông tin sự kiện. Xác nhận chỉ trong vài giây." },
             { step: "03", icon: Image, title: "Nhận ảnh đẹp", desc: "Nhiếp ảnh gia đến đúng giờ, chụp xuất sắc và giao ảnh đã chỉnh sửa đúng hẹn." },
           ].map((s) => (
