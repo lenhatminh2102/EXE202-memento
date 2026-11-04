@@ -391,7 +391,7 @@ function Footer({ navigate }: { navigate: Navigate }) {
     { title: 'Tài khoản', items: [['Đăng nhập', 'login'], ['Đăng ký', 'register'], ['Hồ sơ', 'client-profile']] },
     { title: 'Đặt lịch', items: [['Đặt lịch của tôi', 'history'], ['Yêu thích', 'favorites'], ['Tin nhắn', 'messages']] },
   ];
-  return <footer className="bg-foreground text-white mt-20"><div className="max-w-7xl mx-auto px-6 py-14"><div className="grid md:grid-cols-4 gap-10 mb-10"><div><p className="font-bold text-xl mb-4">Memento</p><p className="text-sm text-white/60">Where Moments Become Memories. Kết nối những khoảnh khắc đáng nhớ.</p><a href="https://github.com/lenhatminh2102/App-Memento/releases/download/android-build-8/memento.apk" className="mt-4 inline-block text-sm font-semibold text-white underline underline-offset-4">Tải về APK</a></div>{links.map(col => <div key={col.title}><h4 className="font-semibold text-sm mb-4">{col.title}</h4><ul className="space-y-2.5">{col.items.map(([label, view]) => <li key={view}><button onClick={() => navigate(view)} className="text-sm text-white/60 hover:text-white">{label}</button></li>)}</ul></div>)}</div><p className="text-xs text-white/40 border-t border-white/10 pt-6">© {new Date().getFullYear()} Memento.</p></div></footer>;
+  return <footer className="bg-foreground text-white mt-20"><div className="max-w-7xl mx-auto px-6 py-14"><div className="grid md:grid-cols-4 gap-10 mb-10"><div><p className="font-bold text-xl mb-4">Memento</p><p className="text-sm text-white/60">Where Moments Become Memories. Kết nối những khoảnh khắc đáng nhớ.</p><a href="https://github.com/lenhatminh2102/App-Memento/releases/download/android-build-8/memento.apk" className="mt-4 inline-block text-sm font-semibold text-white underline underline-offset-4">Tải về APK</a></div>{links.map(col => <div key={col.title}><h4 className="font-semibold text-sm mb-4">{col.title}</h4><ul className="space-y-2.5">{col.items.map(([label, view]) => <li key={view}>{view === "about" || view === "contact" ? <a href={`?view=${view}`} className="text-sm text-white/80 hover:text-white hover:underline">{label}</a> : <button onClick={() => navigate(view)} className="text-sm text-white/60 hover:text-white">{label}</button>}</li>)}</ul></div>)}</div><p className="text-xs text-white/40 border-t border-white/10 pt-6">© {new Date().getFullYear()} Memento.</p></div></footer>;
 }
 
 
@@ -1501,7 +1501,7 @@ export default function App() {
   const { user: authUser, authLoading, login, logout, photographers, recovery } = backend;
   const [view, setView] = useState<View>(() => {
     const requested = new URLSearchParams(window.location.search).get('view');
-    return requested === 'admin-settings' || requested === 'admin-dashboard' ? requested : 'home';
+    return requested === 'about' || requested === 'contact' || requested === 'admin-settings' || requested === 'admin-dashboard' ? requested : 'home';
   });
   const [params, setParams] = useState<Record<string, unknown>>({});
   const navigate: Navigate = (v, p = {}) => { setView(v); setParams(p); window.scrollTo({ top: 0, behavior: 'smooth' }); };
@@ -1547,8 +1547,52 @@ export default function App() {
       case 'admin-reports': return <RevenuePage navigate={navigate} />;
       case 'admin-categories': return <BackendCategories />;
       case 'admin-settings': return <AnalyticsSettingsPage />;
-      case 'about': return <Panel title="Về Memento"><p>Nền tảng kết nối khách hàng với nhiếp ảnh gia.</p></Panel>;
-      case 'contact': return <Panel title="Liên hệ"><p>Đăng nhập và mở cuộc trò chuyện từ đặt lịch để trao đổi với nhiếp ảnh gia.</p></Panel>;
+      case 'about': return <div className="mx-auto max-w-6xl space-y-10 px-5 py-10 sm:py-16">
+        <section className="overflow-hidden rounded-3xl bg-foreground text-white md:grid md:grid-cols-2">
+          <div className="space-y-5 p-7 sm:p-12">
+            <p className="text-sm font-semibold uppercase tracking-widest text-teal-200">Về Memento</p>
+            <h1 className="text-3xl font-bold leading-tight sm:text-5xl">Giữ lại những khoảnh khắc của bạn</h1>
+            <p className="leading-relaxed text-white/85">Tìm nhiếp ảnh gia phù hợp cho buổi chụp chân dung, kỷ yếu, ảnh gia đình hay sự kiện của bạn.</p>
+            <button onClick={() => navigate("search")} className="rounded-full bg-white px-5 py-3 font-semibold text-foreground hover:bg-teal-50">Tìm nhiếp ảnh gia</button>
+          </div>
+          <img src={heroImage} alt="" className="h-48 w-full object-cover md:h-full" />
+        </section>
+        <section>
+          <h2 className="mb-5 text-2xl font-bold">Một buổi chụp bắt đầu thế nào?</h2>
+          <ol className="grid gap-4 md:grid-cols-3">
+            {[
+              ["Tìm nhiếp ảnh gia", "Chọn địa điểm và thể loại phù hợp với buổi chụp."],
+              ["Xem hồ sơ và gói chụp", "Tham khảo bộ ảnh và các gói chụp đang có."],
+              ["Gửi yêu cầu đặt lịch", "Đăng nhập để gửi yêu cầu và trao đổi về buổi chụp."],
+            ].map(([title, description], index) => <li key={title} className="rounded-2xl border border-border bg-card p-6">
+              <span className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-secondary font-bold text-primary">{index + 1}</span>
+              <h3 className="mb-2 font-semibold">{title}</h3>
+              <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
+            </li>)}
+          </ol>
+        </section>
+      </div>;
+      case 'contact': return <div className="mx-auto max-w-5xl space-y-6 px-5 py-10 sm:py-16">
+        <header className="rounded-3xl bg-foreground p-8 text-white sm:p-12">
+          <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-teal-200">Liên hệ</p>
+          <h1 className="mb-3 text-3xl font-bold sm:text-4xl">Bạn cần trao đổi về buổi chụp?</h1>
+          <p className="max-w-xl leading-relaxed text-white/85">Chọn bước phù hợp với bạn để tìm nhiếp ảnh gia hoặc tiếp tục trao đổi về đơn đã đặt.</p>
+        </header>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <section className="flex flex-col items-start rounded-2xl border border-border bg-card p-6">
+            <Camera aria-hidden="true" className="mb-4 h-6 w-6 text-primary" />
+            <h2 className="mb-2 text-lg font-semibold">Bạn đang tìm nhiếp ảnh gia?</h2>
+            <p className="mb-5 flex-1 text-muted-foreground">Xem hồ sơ, bộ ảnh và gói chụp theo địa điểm hoặc phong cách bạn muốn.</p>
+            <button onClick={() => navigate("search")} className="rounded-full bg-primary px-4 py-2 font-semibold text-white hover:opacity-90">Tìm nhiếp ảnh gia</button>
+          </section>
+          <section className="flex flex-col items-start rounded-2xl border border-border bg-card p-6">
+            <BookOpen aria-hidden="true" className="mb-4 h-6 w-6 text-primary" />
+            <h2 className="mb-2 text-lg font-semibold">Bạn đã gửi yêu cầu đặt lịch?</h2>
+            <p className="mb-5 flex-1 text-muted-foreground">Mở đơn và vào cuộc trò chuyện để thống nhất thời gian, địa điểm hoặc yêu cầu chụp.</p>
+            <button onClick={() => navigate("history")} className="rounded-full border border-primary px-4 py-2 font-semibold text-primary hover:bg-secondary">{authUser ? "Xem đặt lịch của tôi" : "Đăng nhập để xem đặt lịch"}</button>
+          </section>
+        </div>
+      </div>;
       default: return <HomePage navigate={navigate} />;
     }
   };

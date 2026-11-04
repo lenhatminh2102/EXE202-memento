@@ -37,19 +37,50 @@ function useAction() {
 
 export function RegisterForm({ onDone }: { onDone: () => void }) {
   const action = useAction()
+  const verification = useAction()
+  const [confirmationEmail, setConfirmationEmail] = useState<string | null>(null)
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [reset, setReset] = useState(0)
+  if (confirmationEmail !== null) return <form className="space-y-4" onSubmit={e => {
+    e.preventDefault()
+    const fields = new FormData(e.currentTarget)
+    void verification.perform(async () => {
+      const email = String(fields.get('email')).trim()
+      const token = String(fields.get('token')).trim()
+      unwrap(await supabase.auth.verifyOtp({ email, token, type: 'email' }))
+      onDone()
+    })
+  }}>
+    <h2 className="text-lg font-semibold">Xác nhận email</h2>
+    <p className="text-sm text-muted-foreground">Nhập mã trong email xác nhận. Nếu email có liên kết xác nhận, bạn cũng có thể bấm vào liên kết đó.</p>
+    <Message error={verification.error} />
+    <Field key={confirmationEmail} label="Email đăng ký" name="email" type="email" value={confirmationEmail} required />
+    <label className="block space-y-1.5 text-sm font-medium">
+      <span>Mã xác nhận</span>
+      <input className={inputClass} name="token" inputMode="numeric" autoComplete="one-time-code" required />
+    </label>
+    <button className={buttonClass} disabled={verification.busy}>{verification.busy ? 'Đang xác nhận…' : 'Xác nhận email'}</button>
+    <button type="button" className="ml-3 text-sm text-primary" disabled={verification.busy} onClick={() => setConfirmationEmail(null)}>Quay lại đăng ký</button>
+  </form>
+
   return <form className="space-y-4" onSubmit={e => {
     e.preventDefault(); const f = new FormData(e.currentTarget)
     void action.perform(async () => {
       const password = String(f.get('password'))
       if (captchaEnabled && !captchaToken) throw new Error('Vui lòng hoàn tất CAPTCHA.')
       if (password.length < 8) throw new Error('Mật khẩu cần ít nhất 8 ký tự.')
-      const signup = unwrap(await supabase.auth.signUp({ email: String(f.get('email')).trim(), password,
-        options: { captchaToken: captchaToken || undefined, emailRedirectTo: window.location.origin, data: { full_name: String(f.get('name')), phone: String(f.get('phone')) } } }))
-      if (signup.user && signup.user.identities?.length) trackConversion('sign_up', { method: 'email' });
-      setCaptchaToken(null); setReset(n => n + 1)
-    }, 'Đã gửi yêu cầu đăng ký. Kiểm tra email xác nhận trước khi đăng nhập.')
+      const email = String(f.get('email')).trim()
+      try {
+        const signup = unwrap(await supabase.auth.signUp({ email, password,
+          options: { captchaToken: captchaToken || undefined, emailRedirectTo: window.location.origin, data: { full_name: String(f.get('name')), phone: String(f.get('phone')) } } }))
+        if (signup.user && signup.user.identities?.length) trackConversion('sign_up', { method: 'email' })
+        if (signup.session) onDone()
+        else setConfirmationEmail(email)
+      } finally {
+        setCaptchaToken(null)
+        setReset(n => n + 1)
+      }
+    })
   }}>
     <Message {...action} />
     <Field label="Họ và tên" name="name" required /><Field label="Email" name="email" type="email" required />
@@ -57,7 +88,7 @@ export function RegisterForm({ onDone }: { onDone: () => void }) {
     <p className="text-sm text-muted-foreground">Tài khoản mới là khách hàng. Bạn có thể gửi hồ sơ trở thành nhiếp ảnh gia sau khi đăng nhập.</p>
     <Captcha onToken={setCaptchaToken} resetKey={reset} />
     <button className={buttonClass} disabled={action.busy}>{action.busy ? 'Đang đăng ký…' : 'Đăng ký'}</button>
-    {action.success && <button type="button" onClick={onDone} className="ml-3 text-primary text-sm">Đến đăng nhập</button>}
+    <button type="button" disabled={action.busy} onClick={() => setConfirmationEmail("")} className="ml-3 text-primary text-sm">Tôi đã có mã xác nhận</button>
   </form>
 }
 
