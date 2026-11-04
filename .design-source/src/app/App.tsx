@@ -21,7 +21,7 @@ import { Captcha, captchaEnabled } from '../../../src/backend/Captcha';
 import { useDesignData } from '../../../src/backend/useDesignData';
 import { supabase, errorMessage, unwrap } from '../../../src/backend/supabase';
 import { createBooking, calcDeposit, todayVN } from '../../../src/backend/bookings';
-import { RegisterForm, ForgotForm, RecoveryPage, ProfilePage, PhotographerEditor, ApplicationPage, BookingList, ReviewsPanel, Notifications, Messages, AdminUsers, AdminApplications, Dashboard, Unsupported, Panel } from '../../../src/backend/BackendPages';
+import { RegisterForm, SignupSurvey, ForgotForm, RecoveryPage, ProfilePage, PhotographerEditor, ApplicationPage, BookingList, ReviewsPanel, Notifications, Messages, AdminUsers, AdminApplications, Dashboard, Unsupported, Panel } from '../../../src/backend/BackendPages';
 
 // ═══════════════════════════════════════════════════════════════
 // TYPES
@@ -1513,6 +1513,7 @@ export default function App() {
   useAnalyticsPage(activeView, role, !authLoading && !recovery);
   useEffect(() => { if (authUser && view === 'login') { setView(dashboard); setParams({}); } }, [authUser?.id, view, dashboard]);
   const signOut = () => { void logout().then(() => navigate('home')).catch(e => window.alert(errorMessage(e))); };
+  const surveyRequired = authUser?.role === "client" && backend.session?.user.user_metadata?.web_survey_required === true && (!backend.profile?.survey_source || !backend.profile?.survey_answers);
   const chosen = photographers.find(p => p.id === Number(params.id ?? params.photographerId));
   const renderPage = () => {
     switch (activeView) {
@@ -1597,7 +1598,7 @@ export default function App() {
     }
   };
   return <div className="min-h-screen bg-background text-foreground" style={{ fontFamily: "'Poppins', sans-serif" }}>
-    {authLoading ? <Panel title="Đang kiểm tra phiên đăng nhập…"><BackendStatus /></Panel> : recovery ? <RecoveryPage /> : role === 'admin' ? <div className="flex h-screen overflow-hidden"><AdminSidebar navigate={navigate} view={activeView} authUser={authUser} logout={signOut} /><div className="flex-1 overflow-y-auto"><BackendStatus />{renderPage()}</div></div> : <><Navbar authUser={authUser} logout={signOut} navigate={navigate} view={activeView} /><BackendStatus />{authUser?.role === 'client' && <div className="max-w-7xl mx-auto px-6 pt-3"><button className="text-xs text-primary underline" onClick={() => navigate('application')}>Trở thành nhiếp ảnh gia</button></div>}<main>{renderPage()}</main>{['home','about','contact','search','photographer-profile','favorites'].includes(activeView) && <Footer navigate={navigate} />}</>}
+    {authLoading ? <Panel title="Đang kiểm tra phiên đăng nhập…"><BackendStatus /></Panel> : recovery ? <RecoveryPage /> : surveyRequired && authUser ? <SignupSurvey key={authUser.id} userId={authUser.id} onLogout={signOut} /> : role === 'admin' ? <div className="flex h-screen overflow-hidden"><AdminSidebar navigate={navigate} view={activeView} authUser={authUser} logout={signOut} /><div className="min-w-0 flex-1 overflow-y-auto"><BackendStatus />{renderPage()}</div></div> : <><Navbar authUser={authUser} logout={signOut} navigate={navigate} view={activeView} /><BackendStatus />{authUser?.role === 'client' && <div className="max-w-7xl mx-auto px-6 pt-3"><button className="text-xs text-primary underline" onClick={() => navigate('application')}>Trở thành nhiếp ảnh gia</button></div>}<main>{renderPage()}</main>{['home','about','contact','search','photographer-profile','favorites'].includes(activeView) && <Footer navigate={navigate} />}</>}
   </div>;
 }
 

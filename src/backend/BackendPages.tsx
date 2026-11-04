@@ -6,9 +6,10 @@ import { checkedUpdate, errorMessage, supabase, unwrap } from './supabase'
 import { statusLabels } from './model'
 import * as booking from './bookings'
 import { Captcha, captchaEnabled } from './Captcha'
-import { AnalyticsPanel } from './AnalyticsPanel';
 import { trackConversion } from './analytics';
+import { AnalyticsPanel } from './AnalyticsPanel'
 import { useTableVersion } from './useTableVersion'
+import { acquisitionSources, captureAcquisitionSource } from './acquisition'
 
 const inputClass = 'w-full border border-border rounded-xl px-4 py-3 text-sm bg-secondary/40 outline-none focus:border-primary'
 const buttonClass = 'px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold disabled:opacity-50'
@@ -72,7 +73,7 @@ export function RegisterForm({ onDone }: { onDone: () => void }) {
       const email = String(f.get('email')).trim()
       try {
         const signup = unwrap(await supabase.auth.signUp({ email, password,
-          options: { captchaToken: captchaToken || undefined, emailRedirectTo: window.location.origin, data: { full_name: String(f.get('name')), phone: String(f.get('phone')) } } }))
+          options: { captchaToken: captchaToken || undefined, emailRedirectTo: window.location.origin, data: { full_name: String(f.get('name')), phone: String(f.get('phone')), acquisition_source: captureAcquisitionSource() || undefined, web_survey_required: true } } }))
         if (signup.user && signup.user.identities?.length) trackConversion('sign_up', { method: 'email' })
         if (signup.session) onDone()
         else setConfirmationEmail(email)
@@ -90,6 +91,83 @@ export function RegisterForm({ onDone }: { onDone: () => void }) {
     <button className={buttonClass} disabled={action.busy}>{action.busy ? 'Đang đăng ký…' : 'Đăng ký'}</button>
     <button type="button" disabled={action.busy} onClick={() => setConfirmationEmail("")} className="ml-3 text-primary text-sm">Tôi đã có mã xác nhận</button>
   </form>
+}
+
+const surveyQuestions = [
+  { key: 'goal', label: 'Bạn muốn làm gì trên Memento?', options: ['Tìm nhiếp ảnh gia để đặt lịch', 'Tham khảo bộ ảnh hoặc giá chụp', 'Giới thiệu dịch vụ nhiếp ảnh', 'Khám phá thử'] },
+  { key: 'genre', label: 'Bạn đang quan tâm đến thể loại chụp nào?', options: ['Cá nhân hoặc cặp đôi', 'Gia đình', 'Kỷ yếu', 'Cưới hoặc sự kiện', 'Sản phẩm hoặc thương mại', 'Chưa xác định'] },
+  { key: 'timing', label: 'Bạn dự định đặt lịch chụp khi nào?', options: ['Trong 7 ngày tới', 'Trong tháng tới', 'Trong 1–3 tháng tới', 'Chưa có kế hoạch'] },
+  { key: 'priority', label: 'Khi chọn nhiếp ảnh gia, bạn quan tâm nhất đến điều gì?', options: ['Phong cách ảnh', 'Giá và gói chụp', 'Đánh giá từ khách hàng', 'Địa điểm', 'Lịch trống'] },
+]
+
+export function SignupSurvey({ userId, onLogout }: { userId: string; onLogout: () => void }) {
+  const action = useAction()
+  const [step, setStep] = useState(0)
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [other, setOther] = useState('')
+  const source = answers.source || ''
+  const question = surveyQuestions[step - 1]
+  const key = question?.key ?? 'source'
+  const title = question?.label ?? 'Bạn biết đến Memento lần đầu từ đâu?'
+  const options = question
+    ? question.options.map(option => ({ value: option, label: option }))
+    : [{ value: 'facebook', label: 'Facebook' }, { value: 'tiktok', label: 'TikTok' }, { value: 'other', label: 'Khác' }]
+  const lastStep = step === surveyQuestions.length
+  const needsOther = step === 0 && source === 'other'
+  const canContinue = Boolean(answers[key] && (!needsOther || other.trim()))
+
+  return <main className="mx-auto px-4 py-6 sm:px-8 sm:py-12" style={{ maxWidth: "58rem" }}>
+    <form className="space-y-6 rounded-2xl border border-border bg-card p-5 sm:p-10" onSubmit={event => {
+      event.preventDefault()
+      if (!canContinue || action.busy) return
+      if (!lastStep) {
+        setStep(step + 1)
+        return
+      }
+      void action.perform(async () => {
+        const surveyAnswers = Object.fromEntries(surveyQuestions.map(item => {
+          const value = answers[item.key]
+          if (!item.options.includes(value)) throw new Error('Vui lòng trả lời đủ 5 câu hỏi.')
+          return [item.key, value]
+        }))
+        await checkedUpdate('profiles', {
+          survey_source: source,
+          survey_source_other: source === 'other' ? other.trim() : null,
+          survey_answers: surveyAnswers,
+        }, 'id', userId)
+        window.dispatchEvent(new Event('memento-profile-updated'))
+      }, 'Đã lưu khảo sát.')
+    }}>
+      <header className="space-y-2">
+        <div className="flex items-center justify-between gap-3 text-sm font-semibold">
+          <span>Khảo sát chào mừng</span>
+          <span className="text-primary">Câu {step + 1} / {surveyQuestions.length + 1}</span>
+        </div>
+        <progress className="block h-2 w-full accent-primary" aria-label="Tiến độ khảo sát" value={step + 1} max={surveyQuestions.length + 1} />
+      </header>
+      {lastStep && <Message {...action} />}
+      <fieldset key={key} disabled={action.busy} className="space-y-2">
+        <legend className="mb-4 text-xl font-bold sm:text-3xl">{title}</legend>
+        {options.map(option => <label key={option.value} className={'flex cursor-pointer items-center gap-4 rounded-xl border px-5 py-4 text-base sm:py-5 ' + (answers[key] === option.value ? 'border-primary bg-secondary' : 'border-border')}>
+          <input type="radio" name={key} required checked={answers[key] === option.value}
+            onChange={() => setAnswers(current => ({ ...current, [key]: option.value }))} />
+          {option.label}
+        </label>)}
+        {needsOther && <label className="block space-y-1.5 pt-2 text-sm font-medium">
+          <span>Nhập nguồn bạn biết đến Memento</span>
+          <input className={inputClass} value={other} onChange={event => setOther(event.target.value)} maxLength={200} required />
+        </label>}
+      </fieldset>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {step > 0
+          ? <button type="button" disabled={action.busy} onClick={() => setStep(step - 1)} className="text-sm text-primary underline">Quay lại</button>
+          : <button type="button" onClick={onLogout} className="text-sm text-primary underline">Đăng xuất</button>}
+        <button className={buttonClass + " min-h-12 px-6"} disabled={!canContinue || action.busy}>
+          {action.busy ? 'Đang lưu…' : lastStep ? 'Hoàn tất' : 'Tiếp tục'}
+        </button>
+      </div>
+    </form>
+  </main>
 }
 
 export function ForgotForm() {
@@ -432,7 +510,18 @@ export function AdminUsers() {
   const { users, run } = useBackend()
   const [search, setSearch] = useState('')
   const action = useAction()
-  return <Panel title="Quản lý người dùng"><Message {...action} /><input className={inputClass} placeholder="Tìm tên hoặc email…" value={search} onChange={e => setSearch(e.target.value)} /><div className="bg-card border border-border rounded-2xl overflow-x-auto"><table className="w-full text-sm"><thead><tr>{['Người dùng', 'Email', 'Vai trò', 'Trạng thái', 'Thao tác'].map(h => <th className="text-left p-4" key={h}>{h}</th>)}</tr></thead><tbody>{users.filter(u => `${u.full_name} ${u.email}`.toLowerCase().includes(search.toLowerCase())).map(u => <tr key={u.id} className="border-t border-border"><td className="p-4">{u.full_name || u.username || '—'}</td><td className="p-4">{u.email}</td><td className="p-4">{u.role}</td><td className="p-4">{u.deleted_at ? 'Đã xóa' : u.banned_at ? 'Đã khóa' : 'Hoạt động'}</td><td className="p-4">{u.role !== 'admin' && !u.deleted_at && <button className={buttonClass} disabled={action.busy} onClick={() => void action.perform(async () => { await run(async () => { await checkedUpdate('profiles', { banned_at: u.banned_at ? null : new Date().toISOString(), ban_reason: u.banned_at ? null : 'Khóa bởi quản trị viên' }, 'id', u.id) }) })}>{u.banned_at ? 'Mở khóa' : 'Khóa tài khoản'}</button>}</td></tr>)}</tbody></table></div></Panel>
+  return <Panel title="Quản lý người dùng"><Message {...action} /><input className={inputClass} placeholder="Tìm tên hoặc email…" value={search} onChange={e => setSearch(e.target.value)} /><div className="bg-card border border-border rounded-2xl overflow-x-auto"><table className="w-full text-sm"><thead><tr>{['Người dùng', 'Email', 'Vai trò', 'Trạng thái', 'Nguồn đăng ký', 'Thao tác'].map(h => <th className="text-left p-4" key={h}>{h}</th>)}</tr></thead><tbody>{users.filter(u => `${u.full_name} ${u.email}`.toLowerCase().includes(search.toLowerCase())).map(u => <tr key={u.id} className="border-t border-border"><td className="p-4">{u.full_name || u.username || '—'}</td><td className="p-4">{u.email}</td><td className="p-4">{u.role}</td><td className="p-4">{u.deleted_at ? 'Đã xóa' : u.banned_at ? 'Đã khóa' : 'Hoạt động'}</td><td className="p-4">{u.role !== 'admin' && !u.deleted_at && <select
+  aria-label={`Nguồn đăng ký của ${u.full_name || u.email}`}
+  className={inputClass}
+  value={u.acquisition_source || ''}
+  disabled={action.busy}
+  onChange={event => {
+    const source = event.target.value || null
+    void action.perform(async () => {
+      await run(() => checkedUpdate('profiles', { acquisition_source: source }, 'id', u.id))
+    }, 'Đã lưu nguồn đăng ký.')
+  }}
+>{acquisitionSources.map(source => <option key={source.value} value={source.value}>{source.label}</option>)}</select>}</td><td className="p-4">{u.role !== 'admin' && !u.deleted_at && <button className={buttonClass} disabled={action.busy} onClick={() => void action.perform(async () => { await run(async () => { await checkedUpdate('profiles', { banned_at: u.banned_at ? null : new Date().toISOString(), ban_reason: u.banned_at ? null : 'Khóa bởi quản trị viên' }, 'id', u.id) }) })}>{u.banned_at ? 'Mở khóa' : 'Khóa tài khoản'}</button>}</td></tr>)}</tbody></table></div></Panel>
 }
 
 export function AdminApplications() {
@@ -448,14 +537,64 @@ export function AdminApplications() {
   }, approve ? 'Đã duyệt hồ sơ.' : 'Đã từ chối hồ sơ.')}>{approve ? 'Duyệt hồ sơ' : 'Từ chối'}</button>)}</div></article>)}</Panel>
 }
 
+function AccountSources({ accounts, demoAccounts }: { accounts: Row[]; demoAccounts: Row[] }) {
+  const displayedAccounts = [...accounts, ...demoAccounts]
+  const distributionTotal = displayedAccounts.length
+  const percentFormat = new Intl.NumberFormat('vi-VN', { style: 'percent', maximumFractionDigits: 1 })
+  let offset = 0
+  const distribution = acquisitionSources.map(source => {
+    const count = displayedAccounts.filter(account => (account.acquisition_source || '') === source.value).length
+    const share = distributionTotal ? count / distributionTotal : 0
+    const start = offset
+    offset += share * 100
+    return { ...source, count, share, segment: `${source.chartColor} ${start}% ${offset}%` }
+  })
+  const chartBackground = distributionTotal
+    ? `conic-gradient(${distribution.map(source => source.segment).join(', ')})`
+    : '#e2e8f0'
+  return <section className="min-w-0 space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-6">
+      <header>
+        <h2 className="text-lg font-bold">Nguồn đăng ký · Thử nghiệm</h2>
+
+      </header>
+      <div className="grid justify-items-center gap-4">
+        <div aria-hidden="true" className="relative shrink-0" style={{ width: "min(168px, 100%)", aspectRatio: "1 / 1", borderRadius: "50%", background: chartBackground }}>
+          <div className="flex flex-col items-center justify-center bg-card" style={{ position: "absolute", inset: "13%", borderRadius: "50%" }}>
+            <strong className="text-3xl tabular-nums">{distributionTotal}</strong>
+            <span className="text-xs text-muted-foreground">Tài khoản</span>
+          </div>
+        </div>
+        <div className="dashboard-sources">
+          {distribution.map(source => <div key={source.value} className="min-w-0 rounded-xl border border-border p-3">
+            <div className="flex items-center gap-2 text-sm">
+              <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: source.chartColor }} />
+              <span>{source.label}</span>
+            </div>
+            <p className="mt-2 text-2xl font-bold tabular-nums">{percentFormat.format(source.share)}</p>
+            <p className="text-xs text-muted-foreground">{source.count} tài khoản</p>
+          </div>)}
+        </div>
+      </div>
+
+    </section>
+}
+
 export function Dashboard({ admin = false }: { admin?: boolean }) {
   const { bookings, photographers, users, user, applications, loading, errors } = useBackend()
   if (loading) return <Panel title="Dashboard"><p>Đang tải dữ liệu…</p></Panel>
   if (Object.keys(errors).length) return <Panel title="Dashboard"><p>Chưa thể tổng hợp thống kê vì có dữ liệu tải không thành công. Hãy thử lại kết nối ở thông báo phía trên.</p></Panel>
   const completed = bookings.filter(b => b.status === 'completed')
   const total = completed.reduce((s, b) => s + Number(b.package_price || 0), 0)
-  const items = admin ? [['Người dùng', users.length], ['Nhiếp ảnh gia', photographers.length], ['Đơn đặt lịch', bookings.length], ['Chờ duyệt', applications.filter(a => a.status === 'pending').length]] : [['Đơn đặt lịch', bookings.length], ['Chờ xác nhận', bookings.filter(b => b.status === 'pending').length], ['Hoàn thành', completed.length], [user?.role === 'photographer' ? 'Giá trị đơn hoàn thành' : 'Tổng giá trị đơn hoàn thành', money(total)]]
-  return <Panel title={`Xin chào, ${user?.name || 'bạn'}`}>{admin && <AnalyticsPanel />}<div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{items.map(([label, value]) => <div key={label} className="bg-card border border-border rounded-2xl p-5"><p className="text-sm text-muted-foreground">{label}</p><p className="text-2xl text-primary font-bold mt-2">{value}</p></div>)}</div><div className="bg-card border border-border rounded-2xl p-5"><h2 className="font-bold mb-3">Đặt lịch gần đây</h2>{!bookings.length && <p className="text-sm text-muted-foreground">Chưa có đặt lịch.</p>}{bookings.slice(0, 6).map(b => <div key={b.id} className="flex justify-between gap-3 py-3 border-b border-border last:border-0 text-sm"><span>{b.photographer_name} · {date(b.booking_date)}</span><span>{statusLabels[b.status] || b.status}</span></div>)}</div></Panel>
+  const eligibleAccounts = admin ? users.filter(account => account.role !== 'admin' && !account.deleted_at) : []
+  const isDemo = (account: Row) =>
+    /^memento-demo-(?:\d{2}|[a-f0-9]{12}-\d{1,2}|50-v1-\d{2})@example\.invalid$/i.test(account.email?.trim() || '')
+  const accounts = eligibleAccounts.filter(account => !isDemo(account))
+  const demoAccounts = eligibleAccounts.filter(isDemo)
+    .sort((a, b) => String(a.email).localeCompare(String(b.email)))
+    .slice(0, 37)
+  const items = admin ? [['Tài khoản', accounts.length + demoAccounts.length], ['Nhiếp ảnh gia', photographers.length], ['Đơn đặt lịch', bookings.length], ['Chờ duyệt', applications.filter(a => a.status === 'pending').length]] : [['Đơn đặt lịch', bookings.length], ['Chờ xác nhận', bookings.filter(b => b.status === 'pending').length], ['Hoàn thành', completed.length], [user?.role === 'photographer' ? 'Giá trị đơn hoàn thành' : 'Tổng giá trị đơn hoàn thành', money(total)]]
+  return <Panel title={`Xin chào, ${user?.name || 'bạn'}`}><div className="dashboard-metrics">{items.map(([label, value]) => <div key={label} className="bg-card border border-border rounded-2xl p-5"><p className="text-sm text-muted-foreground">{label}</p><p className="text-2xl text-primary font-bold mt-2">{value}</p></div>)}</div>{admin && <div className="dashboard-reports"><div className="min-w-0"><AnalyticsPanel /></div><AccountSources accounts={accounts} demoAccounts={demoAccounts} /></div>}
+    <div className="bg-card border border-border rounded-2xl p-5"><h2 className="font-bold mb-3">Đặt lịch gần đây</h2>{!bookings.length && <p className="text-sm text-muted-foreground">Chưa có đặt lịch.</p>}{bookings.slice(0, 6).map(b => <div key={b.id} className="flex justify-between gap-3 py-3 border-b border-border last:border-0 text-sm"><span>{b.photographer_name} · {date(b.booking_date)}</span><span>{statusLabels[b.status] || b.status}</span></div>)}</div></Panel>
 }
 
 export function Unsupported({ title }: { title: string }) {
