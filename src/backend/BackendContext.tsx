@@ -120,7 +120,7 @@ export function BackendProvider({ children }: { children: ReactNode }) {
     const publicPhotographers = async () => {
       const rows = unwrap(await supabase.from('photographers').select('id,user_id,name,location,price,rating,bookings,specialty,avatar,cover,portfolio,bio,tags,packages,boards,standalone_pins,work_locations,shooting_styles,experience_years,equipment,languages,work_model,price_groups,rental_boards,rental_pins,skill_rental,skill_makeup,skill_edit').order('id'))
       const stats = unwrap(await supabase.rpc('get_photographers_stats')) as Row[]
-      const excluded = unwrap(await supabase.from('profiles').select('id').or('banned_at.not.is.null,deleted_at.not.is.null'))
+      const excluded = unwrap(await supabase.from('profiles').select('id').or('banned_at.not.is.null,deleted_at.not.is.null,role.eq.admin'))
       const excludedIds = new Set(excluded.map(p => p.id))
       const byId = new Map((stats || []).map(s => [Number(s.photographer_id), s]))
       return { data: rows.filter(p => !excludedIds.has(p.user_id)).map(p => ({ ...p, ...(byId.get(Number(p.id)) || {}) })), error: null }

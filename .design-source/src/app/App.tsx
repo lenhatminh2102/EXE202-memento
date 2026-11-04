@@ -395,16 +395,57 @@ function Footer({ navigate }: { navigate: Navigate }) {
 }
 
 
+const photoGroups = [
+  { label: "Sự kiện", keys: ["fashionshows", "seminarsworkshops", "networkingevents", "galasawards"] },
+  { label: "Nghệ thuật & Thương mại", keys: ["photography", "commercial", "product", "editorial", "art"] },
+  { label: "Cá nhân & Gia đình", keys: ["personal", "couple", "anniversary", "wedding", "birthday", "familyactivities", "family"] },
+  { label: "Giới trẻ & Văn hoá", keys: ["yearbook", "festivalanimecosplay", "travel", "cosplay", "festival"] },
+];
+
+const photoKey = (tag: string) => tag.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+
+function groupPhotoTags(tags: string[]) {
+  const labels = new Map<string, string>();
+  for (const tag of tags) {
+    const key = photoKey(tag);
+    if (key && (!labels.has(key) || !tag.startsWith("#"))) labels.set(key, tag.replace(/^#+/, "").trim());
+  }
+  return photoGroups.map((group, index) => ({
+    label: group.label,
+    tags: [...labels].filter(([key]) =>
+      group.keys.includes(key) || (index === 1 && !photoGroups.some(other => other.keys.includes(key)))
+    ).map(([, label]) => label),
+  }));
+}
+
+function PhotoGroupList({ groups, selected, onSelect }: {
+  groups: ReturnType<typeof groupPhotoTags>;
+  selected?: string;
+  onSelect: (tag: string) => void;
+}) {
+  return <div className="space-y-3">
+    {groups.map(group => <details key={group.label} className="group rounded-xl border border-border bg-card">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 font-semibold">
+        {group.label}<span aria-hidden="true" className="group-open:rotate-180">⌄</span>
+      </summary>
+      <div className="flex flex-wrap gap-2 border-t border-border p-3">
+        {group.tags.length ? group.tags.map(tag => <button
+          type="button" key={photoKey(tag)} onClick={() => onSelect(tag)}
+          aria-pressed={selected === undefined ? undefined : photoKey(selected) === photoKey(tag)}
+          className="rounded-full border border-border px-3 py-1.5 text-sm hover:bg-secondary aria-pressed:bg-primary aria-pressed:text-white"
+        >{tag}</button>) : <p className="text-sm text-muted-foreground">Chưa có thể loại trong nhóm này.</p>}
+      </div>
+    </details>)}
+  </div>;
+}
+
 function HomePage({ navigate }: { navigate: Navigate }) {
   const { PHOTOGRAPHERS } = useDesignData();
   const { pins, togglePin, loading, errors } = useBackend();
   const [pinError, setPinError] = useState('');
   const [search, setSearch] = useState("");
   const [specialty, setSpecialty] = useState("Tất cả");
-  const categories = [...new Set(PHOTOGRAPHERS.flatMap(p => p.tags))].map(label => {
-    const members = PHOTOGRAPHERS.filter(p => p.tags.includes(label));
-    return { label, img: members.flatMap(p => [p.cover, ...p.portfolio]).find(Boolean), count: members.length };
-  });
+  const categories = groupPhotoTags(PHOTOGRAPHERS.flatMap(p => p.tags));
 
   const reviewVersion = useTableVersion('photographer_reviews');
   const [testimonialError, setTestimonialError] = useState('');
@@ -463,7 +504,7 @@ function HomePage({ navigate }: { navigate: Navigate }) {
               <Camera className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
               <select aria-label="Thể loại chụp" value={specialty} onChange={(e) => setSpecialty(e.target.value)} className="flex-1 text-sm text-foreground outline-none bg-transparent cursor-pointer">
                 <option>Tất cả</option>
-                {categories.map(c => <option key={c.label}>{c.label}</option>)}
+                {categories.filter(group => group.tags.length).map(group => <optgroup key={group.label} label={group.label}>{group.tags.map(tag => <option key={tag}>{tag}</option>)}</optgroup>)}
               </select>
             </div>
             <button
@@ -500,18 +541,7 @@ function HomePage({ navigate }: { navigate: Navigate }) {
           <h2 className="text-3xl font-bold text-foreground mb-3">Tìm phong cách phù hợp</h2>
           <p className="text-muted-foreground max-w-lg mx-auto">Từ ảnh cưới lãng mạn đến chụp ảnh thương mại chuyên nghiệp — chúng tôi có tất cả.</p>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {!categories.length && !loading && <p className="text-muted-foreground">Chưa có danh mục.</p>}{categories.map((c) => (
-            <button key={c.label} onClick={() => navigate("search", { specialty: c.label })} className="group relative rounded-2xl overflow-hidden h-40 cursor-pointer">
-              <img src={c.img || "/avatar.svg"} alt={c.label} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-black/10" />
-              <div className="absolute bottom-0 left-0 right-0 p-3 text-white text-left">
-                <p className="font-semibold text-sm">{c.label}</p>
-                <p className="text-xs text-white/70">{c.count} NÀG</p>
-              </div>
-            </button>
-          ))}
-        </div>
+        <PhotoGroupList groups={categories} onSelect={tag => navigate("search", { specialty: tag })} />
       </section>
 
       {/* Featured photographers */}
@@ -762,11 +792,11 @@ function SearchPage({ navigate, initialLocation = "", initialSpecialty = "Tất 
 
   const toggleFav = (id: number) => { void togglePin(id).catch(e => setFavoriteError(errorMessage(e))); };
 
-  const specs = ["Tất cả", ...new Set(PHOTOGRAPHERS.flatMap(p => p.tags))];
+  const specs = groupPhotoTags(PHOTOGRAPHERS.flatMap(p => p.tags));
   const locs = ["Tất cả", ...new Set(PHOTOGRAPHERS.flatMap(p => p.work_locations || [p.location]))];
 
   const filtered = PHOTOGRAPHERS.filter((p) => {
-    const matchSpec = filterSpec === "Tất cả" || p.tags.some((t) => t.includes(filterSpec)) || p.specialty.includes(filterSpec);
+    const matchSpec = filterSpec === "Tất cả" || p.tags.some(t => photoKey(t) === photoKey(filterSpec)) || photoKey(p.specialty) === photoKey(filterSpec);
     const matchLoc = filterLoc === "Tất cả" || p.location.includes(filterLoc);
     return matchSpec && matchLoc;
   }).sort((a, b) => sortBy === "rating" ? b.rating - a.rating : sortBy === "price_asc" ? a.price - b.price : b.price - a.price);
@@ -789,13 +819,11 @@ function SearchPage({ navigate, initialLocation = "", initialSpecialty = "Tất 
 
             <div className="mb-5">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Phong cách</p>
-              <div className="space-y-1.5">
-                {specs.map((s) => (
-                  <button key={s} onClick={() => setFilterSpec(s)} className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${filterSpec === s ? "font-semibold text-white" : "text-foreground hover:bg-secondary"}`} style={filterSpec === s ? { backgroundColor: "#0F6D6A" } : {}}>
-                    {s}
-                  </button>
-                ))}
-              </div>
+              <button type="button" onClick={() => setFilterSpec("Tất cả")} className="mb-3 text-sm underline">
+                Tất cả thể loại
+              </button>
+              {filterSpec !== "Tất cả" && <p className="mb-3 text-sm text-muted-foreground">Đang lọc: {filterSpec}</p>}
+              <PhotoGroupList groups={specs} selected={filterSpec} onSelect={setFilterSpec} />
             </div>
 
             <div className="mb-5">
