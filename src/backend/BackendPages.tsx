@@ -340,13 +340,13 @@ export function ApplicationPage() {
     return () => { live = false }
   }, [user?.id])
   if (!user) return null
-  return <Panel title="Đăng ký trở thành nhiếp ảnh gia"><Message error={loadError} />{loading ? <p>Đang tải hồ sơ…</p> : existing?.status === 'pending' || existing?.status === 'approved' ? <p>Trạng thái hồ sơ: {existing.status === 'pending' ? 'Đang chờ duyệt' : 'Đã duyệt'}.</p> : <form className="bg-card border border-border rounded-2xl p-6 space-y-4 max-w-3xl" onSubmit={e => {
+  return <Panel title="Đăng ký trở thành nhiếp ảnh gia"><Message error={loadError} />{loading ? <p>Đang tải hồ sơ…</p> : existing?.status === 'submitted' || existing?.status === 'approved' ? <p>Trạng thái hồ sơ: {existing.status === 'submitted' ? 'Đang chờ duyệt' : 'Đã duyệt'}.</p> : <form className="bg-card border border-border rounded-2xl p-6 space-y-4 max-w-3xl" onSubmit={e => {
     e.preventDefault(); const f = new FormData(e.currentTarget)
     void action.perform(async () => {
       await run(async () => {
         const payload = { user_id: user.id, full_name: String(f.get('name')), phone: String(f.get('phone')), bio: String(f.get('bio')),
           work_locations: String(f.get('location')).split(',').map(s => s.trim()), selected_styles: String(f.get('styles')).split(',').map(s => s.trim()),
-          proof_link: String(f.get('proof')), agreed_terms: true, status: 'pending', submitted_at: new Date().toISOString() }
+          proof_link: String(f.get('proof')), agreed_terms: true, status: 'submitted', submitted_at: new Date().toISOString() }
         const saved = unwrap(await supabase.from('photographer_applications').upsert(payload, { onConflict: 'user_id' }).select('*').single())
         setExisting(saved)
       })
@@ -553,7 +553,7 @@ export function AdminApplications() {
   const { applications, run } = useBackend()
   const action = useAction()
   const [notes, setNotes] = useState<Record<string, string>>({})
-  return <Panel title="Duyệt hồ sơ nhiếp ảnh gia"><Message {...action} />{!applications.some(a => a.status === 'pending') && <p>Không có hồ sơ chờ duyệt.</p>}{applications.filter(a => a.status === 'pending').map(a => <article key={a.user_id} className="bg-card border border-border rounded-2xl p-5 space-y-3"><h3 className="font-bold">{a.full_name}</h3><p className="text-sm">{a.bio}</p><p className="text-sm">{(a.work_locations || []).join(', ')} · {(a.selected_styles || []).join(', ')}</p>{a.proof_link && /^https:\/\//.test(a.proof_link) && <a href={a.proof_link} target="_blank" rel="noreferrer" className="text-primary underline text-sm">Xem minh chứng</a>}<input className={inputClass} value={notes[a.user_id] || ''} onChange={e => setNotes(n => ({ ...n, [a.user_id]: e.target.value }))} placeholder="Lý do từ chối (bắt buộc khi từ chối)" /><div className="flex gap-2">{[true, false].map(approve => <button key={String(approve)} className={buttonClass} disabled={action.busy} onClick={() => void action.perform(async () => {
+  return <Panel title="Duyệt hồ sơ nhiếp ảnh gia"><Message {...action} />{!applications.some(a => a.status === 'submitted') && <p>Không có hồ sơ chờ duyệt.</p>}{applications.filter(a => a.status === 'submitted').map(a => <article key={a.user_id} className="bg-card border border-border rounded-2xl p-5 space-y-3"><h3 className="font-bold">{a.full_name}</h3><p className="text-sm">{a.bio}</p><p className="text-sm">{(a.work_locations || []).join(', ')} · {(a.selected_styles || []).join(', ')}</p>{a.proof_link && /^https:\/\//.test(a.proof_link) && <a href={a.proof_link} target="_blank" rel="noreferrer" className="text-primary underline text-sm">Xem minh chứng</a>}<input className={inputClass} value={notes[a.user_id] || ''} onChange={e => setNotes(n => ({ ...n, [a.user_id]: e.target.value }))} placeholder="Lý do từ chối (bắt buộc khi từ chối)" /><div className="flex gap-2">{[true, false].map(approve => <button key={String(approve)} className={buttonClass} disabled={action.busy} onClick={() => void action.perform(async () => {
     if (!approve && !notes[a.user_id]?.trim()) throw new Error('Vui lòng nhập lý do từ chối.')
     await run(async () => {
       const result = unwrap(await supabase.rpc('admin_set_application_status', { p_user_id: a.user_id, p_status: approve ? 'approved' : 'rejected', p_note: approve ? null : notes[a.user_id].trim() }))
@@ -617,7 +617,7 @@ export function Dashboard({ admin = false }: { admin?: boolean }) {
   const demoAccounts = eligibleAccounts.filter(isDemo)
     .sort((a, b) => String(a.email).localeCompare(String(b.email)))
     .slice(0, 37)
-  const items = admin ? [['Tài khoản', accounts.length + demoAccounts.length], ['Nhiếp ảnh gia', photographers.length], ['Đơn đặt lịch', bookings.length], ['Chờ duyệt', applications.filter(a => a.status === 'pending').length]] : [['Đơn đặt lịch', bookings.length], ['Chờ xác nhận', bookings.filter(b => b.status === 'pending').length], ['Hoàn thành', completed.length], [user?.role === 'photographer' ? 'Giá trị đơn hoàn thành' : 'Tổng giá trị đơn hoàn thành', money(total)]]
+  const items = admin ? [['Tài khoản', accounts.length + demoAccounts.length], ['Nhiếp ảnh gia', photographers.length], ['Đơn đặt lịch', bookings.length], ['Chờ duyệt', applications.filter(a => a.status === 'submitted').length]] : [['Đơn đặt lịch', bookings.length], ['Chờ xác nhận', bookings.filter(b => b.status === 'pending').length], ['Hoàn thành', completed.length], [user?.role === 'photographer' ? 'Giá trị đơn hoàn thành' : 'Tổng giá trị đơn hoàn thành', money(total)]]
   return <Panel title={`Xin chào, ${user?.name || 'bạn'}`}><div className="dashboard-metrics">{items.map(([label, value]) => <div key={label} className="bg-card border border-border rounded-2xl p-5"><p className="text-sm text-muted-foreground">{label}</p><p className="text-2xl text-primary font-bold mt-2">{value}</p></div>)}</div>{admin && <div className="dashboard-reports"><div className="min-w-0"><AnalyticsPanel /></div><AccountSources accounts={accounts} demoAccounts={demoAccounts} /></div>}
     <div className="bg-card border border-border rounded-2xl p-5"><h2 className="font-bold mb-3">Đặt lịch gần đây</h2>{!bookings.length && <p className="text-sm text-muted-foreground">Chưa có đặt lịch.</p>}{bookings.slice(0, 6).map(b => <div key={b.id} className="flex justify-between gap-3 py-3 border-b border-border last:border-0 text-sm"><span>{b.photographer_name} · {date(b.booking_date)}</span><span>{statusLabels[b.status] || b.status}</span></div>)}</div></Panel>
 }
