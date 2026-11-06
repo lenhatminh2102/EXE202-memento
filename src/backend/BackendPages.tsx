@@ -172,16 +172,41 @@ export function SignupSurvey({ userId, onLogout }: { userId: string; onLogout: (
 
 export function ForgotForm() {
   const action = useAction()
+  const verification = useAction()
+  const [recoveryEmail, setRecoveryEmail] = useState('')
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [reset, setReset] = useState(0)
+  if (recoveryEmail) return <form className="space-y-4" onSubmit={e => {
+    e.preventDefault()
+    const token = String(new FormData(e.currentTarget).get('token')).trim()
+    void verification.perform(async () => {
+      if (!/^\d{6}$/.test(token)) throw new Error('Vui lòng nhập đúng 6 chữ số.')
+      unwrap(await supabase.auth.verifyOtp({ email: recoveryEmail, token, type: 'recovery' }))
+    })
+  }}>
+    <Message error={verification.error} />
+    <p className="text-sm text-muted-foreground">Nếu email có tài khoản, bạn sẽ nhận được hướng dẫn khôi phục. Nhập mã gửi đến {recoveryEmail} hoặc mở link trong email.</p>
+    <label className="block space-y-1.5 text-sm font-medium">
+      <span>Mã khôi phục 6 số</span>
+      <input className={inputClass} name="token" inputMode="numeric" autoComplete="one-time-code" maxLength={6} pattern="[0-9]{6}" required />
+    </label>
+    <div className="flex flex-wrap items-center gap-3">
+      <button className={buttonClass} disabled={verification.busy}>{verification.busy ? 'Đang xác nhận…' : 'Xác nhận mã'}</button>
+      <button type="button" className="text-sm text-primary underline" disabled={verification.busy} onClick={() => setRecoveryEmail('')}>Quay lại gửi yêu cầu</button>
+    </div>
+  </form>
   return <form className="space-y-4" onSubmit={e => {
     e.preventDefault(); const f = new FormData(e.currentTarget)
     void action.perform(async () => {
       if (captchaEnabled && !captchaToken) throw new Error('Vui lòng hoàn tất CAPTCHA.')
-      try { unwrap(await supabase.auth.resetPasswordForEmail(String(f.get('email')).trim(), { redirectTo: window.location.origin, captchaToken: captchaToken || undefined })) }
+      const email = String(f.get('email')).trim()
+      try {
+        unwrap(await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin, captchaToken: captchaToken || undefined }))
+        setRecoveryEmail(email)
+      }
       finally { setCaptchaToken(null); setReset(n => n + 1) }
     }, 'Nếu email có tài khoản, bạn sẽ nhận được hướng dẫn khôi phục.')
-  }}><Message {...action} /><Field label="Email" name="email" type="email" required /><Captcha onToken={setCaptchaToken} resetKey={reset} /><button className={buttonClass} disabled={action.busy}>Gửi link khôi phục</button></form>
+  }}><Message {...action} /><Field label="Email" name="email" type="email" required /><Captcha onToken={setCaptchaToken} resetKey={reset} /><button className={buttonClass} disabled={action.busy}>Gửi email khôi phục</button></form>
 }
 
 export function RecoveryPage() {
