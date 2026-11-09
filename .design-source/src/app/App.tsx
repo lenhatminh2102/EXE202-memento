@@ -3,6 +3,7 @@ import { AnalyticsSettingsPage } from '../../../src/backend/AnalyticsPanel';
 import React, { useState, useEffect } from "react";
 import { useTableVersion } from '../../../src/backend/useTableVersion';
 import heroImage from '../../../src/assets/hero.png';
+import landingHero from '../../../src/assets/landing-hero.jpg';
 import {
   Camera, Search, Star, Heart, Bell, ChevronDown, MapPin,
   Calendar, Clock, DollarSign, Users, TrendingUp, CheckCircle,
@@ -469,8 +470,9 @@ function HomePage({ navigate }: { navigate: Navigate }) {
       {/* Hero */}
       <section className="relative overflow-hidden bg-foreground">
         <img
-          src={heroImage}
-          alt="Photography hero"
+          src={landingHero}
+          alt=""
+          fetchPriority="high"
           className="absolute inset-0 w-full h-full object-cover"
         />
         <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(10,30,30,0.6) 0%, rgba(10,30,30,0.5) 50%, rgba(10,30,30,0.75) 100%)" }} />
@@ -482,7 +484,7 @@ function HomePage({ navigate }: { navigate: Navigate }) {
           </div>
 
           <h1 className="text-4xl md:text-6xl font-bold mb-4 leading-tight max-w-3xl">
-            Tìm nhiếp ảnh gia
+            Tìm nhiếp ảnh gia{' '}
             <span style={{ color: "#7EE6D8" }}>cho dịp của bạn</span>
           </h1>
           <p className="text-base text-white/90 mb-6 max-w-xl font-light">
@@ -1597,7 +1599,7 @@ export default function App() {
       default: return <HomePage navigate={navigate} />;
     }
   };
-  return <div className="min-h-screen bg-background text-foreground" style={{ fontFamily: "'Poppins', sans-serif" }}>
+  return <div className="min-h-screen bg-background text-foreground">
     {authLoading ? <Panel title="Đang kiểm tra phiên đăng nhập…"><BackendStatus /></Panel> : recovery ? <RecoveryPage /> : surveyRequired && authUser ? <SignupSurvey key={authUser.id} userId={authUser.id} onLogout={signOut} /> : role === 'admin' ? <div className="flex h-screen overflow-hidden"><AdminSidebar navigate={navigate} view={activeView} authUser={authUser} logout={signOut} /><div className="min-w-0 flex-1 overflow-y-auto"><BackendStatus />{renderPage()}</div></div> : <><Navbar authUser={authUser} logout={signOut} navigate={navigate} view={activeView} /><BackendStatus />{authUser?.role === 'client' && <div className="max-w-7xl mx-auto px-6 pt-3"><button className="text-xs text-primary underline" onClick={() => navigate('application')}>Trở thành nhiếp ảnh gia</button></div>}<main>{renderPage()}</main>{['home','about','contact','search','photographer-profile','favorites'].includes(activeView) && <Footer navigate={navigate} />}</>}
   </div>;
 }
