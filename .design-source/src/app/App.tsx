@@ -2,7 +2,6 @@ import { useAnalyticsPage, trackConversion } from '../../../src/backend/analytic
 import { AnalyticsSettingsPage } from '../../../src/backend/AnalyticsPanel';
 import React, { useState, useEffect } from "react";
 import { useTableVersion } from '../../../src/backend/useTableVersion';
-import heroImage from '../../../src/assets/hero.png';
 import landingHero from '../../../src/assets/landing-hero.jpg';
 import {
   Camera, Search, Star, Heart, Bell, ChevronDown, MapPin,
@@ -442,7 +441,7 @@ function PhotoGroupList({ groups, selected, onSelect }: {
 
 function HomePage({ navigate }: { navigate: Navigate }) {
   const { PHOTOGRAPHERS } = useDesignData();
-  const { pins, togglePin, loading, errors } = useBackend();
+  const { pins, togglePin, loading, errors, photographersLoaded } = useBackend();
   const [pinError, setPinError] = useState('');
   const [search, setSearch] = useState("");
   const [specialty, setSpecialty] = useState("Tất cả");
@@ -528,7 +527,7 @@ function HomePage({ navigate }: { navigate: Navigate }) {
               { value: String(PHOTOGRAPHERS.reduce((sum, p) => sum + p.reviews, 0)), label: "Đánh giá" },
             ].map((s) => (
               <div key={s.label} className="text-center text-white">
-                <p className="text-2xl font-bold">{loading || errors["Danh sách thợ"] ? "—" : s.value}</p>
+                <p className="text-2xl font-bold tabular-nums">{photographersLoaded ? s.value : "—"}</p>
                 <p className="text-xs text-white/70">{s.label}</p>
               </div>
             ))}
@@ -592,9 +591,9 @@ function HomePage({ navigate }: { navigate: Navigate }) {
       </section>
 
       {/* CTA Banner */}
-      <section className="mx-6 mb-10 rounded-3xl overflow-hidden relative">
-        <img src={heroImage} alt="CTA" className="w-full h-72 object-cover" />
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-white px-4" style={{ background: "rgba(10,79,77,0.82)" }}>
+      <section className="mx-6 mb-10 rounded-3xl overflow-hidden relative bg-foreground">
+        <img src={landingHero} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+        <div className="relative flex min-h-72 flex-col items-center justify-center px-4 py-10 text-center text-white" style={{ background: "rgba(10,45,43,0.68)" }}>
           <h2 className="text-3xl font-bold mb-3">Bạn là nhiếp ảnh gia?</h2>
           <p className="text-white/80 mb-7 max-w-md">Tham gia Memento — kết nối với hàng nghìn khách hàng tiềm năng và phát triển sự nghiệp của bạn.</p>
           <button onClick={() => navigate("register")} className="px-8 py-3.5 rounded-xl font-bold text-foreground transition-opacity hover:opacity-90" style={{ backgroundColor: "#7EE6D8" }}>
@@ -640,7 +639,7 @@ function AuthShell({ title, subtitle, children, navigate, altLink, altText, altA
   return (
     <div className="min-h-[calc(100vh-64px)] flex">
       <div className="hidden lg:block flex-1 relative">
-        <img src={heroImage} alt="auth" className="w-full h-full object-cover" />
+        <img src={landingHero} alt="" className="absolute inset-0 w-full h-full object-cover" style={{ objectPosition: "right center" }} />
         <div className="absolute inset-0 flex flex-col justify-end p-12" style={{ background: "linear-gradient(to top, rgba(10,79,77,0.9) 0%, transparent 60%)" }}>
           <div className="flex items-center gap-2 mb-4">
             <Camera className="w-6 h-6" style={{ color: "#7EE6D8" }} />
@@ -784,30 +783,38 @@ function ForgotPage({ navigate }: { navigate: Navigate }) {
 
 function SearchPage({ navigate, initialLocation = "", initialSpecialty = "Tất cả" }: { navigate: Navigate; initialLocation?: string; initialSpecialty?: string }) {
   const { PHOTOGRAPHERS } = useDesignData();
-  const { pins, togglePin } = useBackend();
+  const { pins, togglePin, loading, errors } = useBackend();
   const [favoriteError, setFavoriteError] = useState('');
   const favs = new Set(pins);
   const [filterSpec, setFilterSpec] = useState(initialSpecialty);
   const [filterLoc, setFilterLoc] = useState(initialLocation || "Tất cả");
-  const [sortBy, setSortBy] = useState("rating");
+  const sortOptions = {
+    rating: { label: "Đánh giá cao nhất", compare: (a: typeof PHOTOGRAPHERS[number], b: typeof PHOTOGRAPHERS[number]) => b.rating - a.rating },
+    completed: { label: "Nhiều buổi chụp nhất", compare: (a: typeof PHOTOGRAPHERS[number], b: typeof PHOTOGRAPHERS[number]) => b.completedJobs - a.completedJobs },
+    price_asc: { label: "Giá thấp đến cao", compare: (a: typeof PHOTOGRAPHERS[number], b: typeof PHOTOGRAPHERS[number]) => (a.price || Infinity) - (b.price || Infinity) },
+    price_desc: { label: "Giá cao đến thấp", compare: (a: typeof PHOTOGRAPHERS[number], b: typeof PHOTOGRAPHERS[number]) => b.price - a.price },
+  };
+  const [sortBy, setSortBy] = useState<keyof typeof sortOptions>("rating");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const toggleFav = (id: number) => { void togglePin(id).catch(e => setFavoriteError(errorMessage(e))); };
 
   const specs = groupPhotoTags(PHOTOGRAPHERS.flatMap(p => p.tags));
-  const locs = ["Tất cả", ...new Set(PHOTOGRAPHERS.flatMap(p => p.work_locations || [p.location]))];
+  const locs = ["Tất cả", ...new Set(PHOTOGRAPHERS.flatMap(p => [p.location, ...(p.work_locations || [])]).filter(Boolean))];
+  const locationQuery = filterLoc.trim().toLocaleLowerCase("vi");
+  const listError = errors["Danh sách thợ"];
 
   const filtered = PHOTOGRAPHERS.filter((p) => {
     const matchSpec = filterSpec === "Tất cả" || p.tags.some(t => photoKey(t) === photoKey(filterSpec)) || photoKey(p.specialty) === photoKey(filterSpec);
-    const matchLoc = filterLoc === "Tất cả" || p.location.includes(filterLoc);
+    const matchLoc = filterLoc === "Tất cả" || [p.location, ...(p.work_locations || [])].some(location => location.toLocaleLowerCase("vi").includes(locationQuery));
     return matchSpec && matchLoc;
-  }).sort((a, b) => sortBy === "rating" ? b.rating - a.rating : sortBy === "price_asc" ? a.price - b.price : b.price - a.price);
+  }).sort(sortOptions[sortBy].compare);
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">{favoriteError && <p role="alert" className="text-red-700">{favoriteError}</p>}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground mb-1">Tìm nhiếp ảnh gia</h1>
-        <p className="text-muted-foreground text-sm">{filtered.length} nhiếp ảnh gia phù hợp với bộ lọc của bạn</p>
+        <p className="text-muted-foreground text-sm">{listError ? "Chưa tải được danh sách nhiếp ảnh gia." : loading && !PHOTOGRAPHERS.length ? "Đang tải danh sách nhiếp ảnh gia…" : `${filtered.length} nhiếp ảnh gia phù hợp với bộ lọc của bạn`}</p>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6">
@@ -861,14 +868,17 @@ function SearchPage({ navigate, initialLocation = "", initialSpecialty = "Tất 
                 <List className="w-4 h-4" />
               </button>
             </div>
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="border border-border rounded-xl px-3 py-2 text-sm text-foreground outline-none bg-card cursor-pointer">
-              <option value="rating">Đánh giá cao nhất</option>
-              <option value="price_asc">Giá thấp → cao</option>
-              <option value="price_desc">Giá cao → thấp</option>
+            <select aria-label="Sắp xếp nhiếp ảnh gia" value={sortBy} onChange={(e) => setSortBy(e.target.value as keyof typeof sortOptions)} className="border border-border rounded-xl px-3 py-2 text-sm text-foreground bg-card cursor-pointer">
+              {Object.entries(sortOptions).map(([value, option]) => <option key={value} value={value}>{option.label}</option>)}
             </select>
           </div>
 
-          {viewMode === "grid" ? (
+          {!filtered.length && !loading && !listError ? (
+            <div className="rounded-2xl border border-border bg-card p-6 text-sm">
+              <p>{PHOTOGRAPHERS.length ? "Không có nhiếp ảnh gia phù hợp với bộ lọc hiện tại." : "Chưa có nhiếp ảnh gia để hiển thị."}</p>
+              {(filterSpec !== "Tất cả" || filterLoc !== "Tất cả") && <button type="button" className="mt-3 text-primary underline" onClick={() => { setFilterSpec("Tất cả"); setFilterLoc("Tất cả"); }}>Xóa bộ lọc</button>}
+            </div>
+          ) : viewMode === "grid" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
               {filtered.map((p) => (
                 <PhotographerCard key={p.id} p={p} navigate={navigate} favs={favs} toggleFav={toggleFav} />
@@ -1558,7 +1568,9 @@ export default function App() {
             <p className="leading-relaxed text-white/85">Tìm nhiếp ảnh gia phù hợp cho buổi chụp chân dung, kỷ yếu, ảnh gia đình hay sự kiện của bạn.</p>
             <button onClick={() => navigate("search")} className="rounded-full bg-white px-5 py-3 font-semibold text-foreground hover:bg-teal-50">Tìm nhiếp ảnh gia</button>
           </div>
-          <img src={heroImage} alt="" className="h-48 w-full object-cover md:h-full" />
+          <div className="relative h-48 md:h-auto">
+            <img src={landingHero} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "left center" }} />
+          </div>
         </section>
         <section>
           <h2 className="mb-5 text-2xl font-bold">Một buổi chụp bắt đầu thế nào?</h2>

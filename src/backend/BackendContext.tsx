@@ -26,7 +26,7 @@ export function mapPhotographer(p: Row): Photographer {
 
 type State = {
   user: User | null; profile: Row | null; session: Session | null; authLoading: boolean; loading: boolean;
-  photographers: Photographer[]; bookings: Row[]; pins: number[]; notifications: Row[]; users: Row[]; applications: Row[];
+  photographers: Photographer[]; photographersLoaded: boolean; bookings: Row[]; pins: number[]; notifications: Row[]; users: Row[]; applications: Row[];
   errors: Record<string, string>; recovery: boolean;
   refresh: () => Promise<void>; login: (email: string, password: string, captchaToken?: string) => Promise<void>; logout: () => Promise<void>;
   run: <T>(task: () => Promise<T>) => Promise<T>; togglePin: (id: number) => Promise<void>;
@@ -44,6 +44,7 @@ export function BackendProvider({ children }: { children: ReactNode }) {
   const [authLoading, setAuthLoading] = useState(true)
   const [loading, setLoading] = useState(false)
   const [photographers, setPhotographers] = useState<Photographer[]>([])
+  const [photographersLoaded, setPhotographersLoaded] = useState(false)
   const [bookings, setBookings] = useState<Row[]>([])
   const [pins, setPins] = useState<number[]>([])
   const [notifications, setNotifications] = useState<Row[]>([])
@@ -108,13 +109,13 @@ export function BackendProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     const nextErrors: Record<string, string> = {}
     if (!backendConfigured) nextErrors.config = 'Chưa cấu hình Supabase. Điền .env.local theo .env.example.'
-    const read = async (name: string, query: PromiseLike<any>, commit: (rows: Row[]) => void) => {
+    const read = async (name: string, query: PromiseLike<any>, commit: (rows: Row[], success: boolean) => void) => {
       try {
         const data = unwrap(await query) as Row[]
-        if (version === dataVersion.current) commit(data || [])
+        if (version === dataVersion.current) commit(data || [], true)
       } catch (error) {
         nextErrors[name] = errorMessage(error)
-        if (version === dataVersion.current) commit([])
+        if (version === dataVersion.current) commit([], false)
       }
     }
     const publicPhotographers = async () => {
@@ -125,7 +126,10 @@ export function BackendProvider({ children }: { children: ReactNode }) {
       const byId = new Map((stats || []).map(s => [Number(s.photographer_id), s]))
       return { data: rows.filter(p => !excludedIds.has(p.user_id)).map(p => ({ ...p, ...(byId.get(Number(p.id)) || {}) })), error: null }
     }
-    const tasks = [read('Danh sách thợ', publicPhotographers(), rows => setPhotographers(rows.map(mapPhotographer)))]
+    const tasks = [read('Danh sách thợ', publicPhotographers(), (rows, success) => {
+      setPhotographers(rows.map(mapPhotographer))
+      setPhotographersLoaded(success)
+    })]
     if (uid && profile) {
       let bookingQuery = supabase.from('bookings').select('*').order('created_at', { ascending: false })
       if (role !== 'admin') bookingQuery = bookingQuery.or(`client_id.eq.${uid},photographer_user_id.eq.${uid}`)
@@ -173,7 +177,7 @@ export function BackendProvider({ children }: { children: ReactNode }) {
     name: profile.full_name || profile.username || session.user.email || 'Thành viên',
     role: role === 'admin' ? 'admin' : role === 'photographer' ? 'photographer' : 'client' } : null
   const run = async <T,>(task: () => Promise<T>) => { const result = await task(); await refresh(); return result }
-  return <Context.Provider value={{ session, profile, user, authLoading, loading, photographers, bookings, pins, notifications, users, applications, errors, recovery,
+  return <Context.Provider value={{ session, profile, user, authLoading, loading, photographers, photographersLoaded, bookings, pins, notifications, users, applications, errors, recovery,
     refresh, run,
     login: async (email, password, captchaToken) => { unwrap(await supabase.auth.signInWithPassword({ email, password, options: { captchaToken } })) },
     logout: async () => { unwrap(await supabase.auth.signOut()); setRecovery(false) },
