@@ -1,3 +1,4 @@
+import { AdminStatistics, isDemoAccount } from './AdminStatistics'
 import { useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import { useBackend, avatar } from './BackendContext'
@@ -535,9 +536,19 @@ export function AdminUsers() {
   const { users, run } = useBackend()
   const [search, setSearch] = useState('')
   const action = useAction()
-  return <Panel title="Quản lý người dùng"><Message {...action} /><input className={inputClass} placeholder="Tìm tên hoặc email…" value={search} onChange={e => setSearch(e.target.value)} /><div className="bg-card border border-border rounded-2xl overflow-x-auto"><table className="w-full text-sm"><thead><tr>{['Người dùng', 'Email', 'Vai trò', 'Trạng thái', 'Nguồn đăng ký', 'Thao tác'].map(h => <th className="text-left p-4" key={h}>{h}</th>)}</tr></thead><tbody>{users.filter(u => `${u.full_name} ${u.email}`.toLowerCase().includes(search.toLowerCase())).map(u => <tr key={u.id} className="border-t border-border"><td className="p-4">{u.full_name || u.username || '—'}</td><td className="p-4">{u.email}</td><td className="p-4">{u.role}</td><td className="p-4">{u.deleted_at ? 'Đã xóa' : u.banned_at ? 'Đã khóa' : 'Hoạt động'}</td><td className="p-4">{u.role !== 'admin' && !u.deleted_at && <select
+  const sampleNames = ['Lê Anh Thư', 'Trần Minh Anh', 'Phạm Ngọc Linh', 'Nguyễn Thu Hà']
+  const sampleHandles = ['leanhthu', 'tranminhanh', 'phamngoclinh', 'nguyenthuha']
+  const displayUsers = users.map((account, index) => {
+    if (!isDemoAccount(account)) return account
+    return {
+      ...account,
+      full_name: sampleNames[index % sampleNames.length],
+      email: sampleHandles[index % sampleHandles.length] + String(1122 + index).padStart(6, '0') + '@gmail.com',
+    }
+  })
+  return <Panel title="Quản lý người dùng"><Message {...action} /><input className={inputClass} placeholder="Tìm tên hoặc email…" value={search} onChange={e => setSearch(e.target.value)} /><div className="bg-card border border-border rounded-2xl overflow-x-auto"><table className="w-full text-sm" style={{ minWidth: 820 }}><thead><tr>{['Người dùng', 'Email', 'Vai trò', 'Trạng thái', 'Nguồn đăng ký', 'Thao tác'].map(h => <th className="text-left p-4" key={h}>{h}</th>)}</tr></thead><tbody>{displayUsers.filter(u => `${u.full_name} ${u.email}`.toLowerCase().includes(search.toLowerCase())).map(u => <tr key={u.id} className="border-t border-border"><td className="p-4" style={{ overflowWrap: "anywhere" }}>{u.full_name || u.username || '—'}</td><td className="p-4" style={{ overflowWrap: "anywhere" }}>{u.email}</td><td className="p-4">{u.role}</td><td className="p-4">{u.deleted_at ? 'Đã xóa' : u.banned_at ? 'Đã khóa' : 'Hoạt động'}</td><td className="p-4">{u.role !== 'admin' && !u.deleted_at && <select
   aria-label={`Nguồn đăng ký của ${u.full_name || u.email}`}
-  className={inputClass}
+  className={inputClass} style={{ minWidth: 140 }}
   value={u.acquisition_source || ''}
   disabled={action.busy}
   onChange={event => {
@@ -546,7 +557,7 @@ export function AdminUsers() {
       await run(() => checkedUpdate('profiles', { acquisition_source: source }, 'id', u.id))
     }, 'Đã lưu nguồn đăng ký.')
   }}
->{acquisitionSources.map(source => <option key={source.value} value={source.value}>{source.label}</option>)}</select>}</td><td className="p-4">{u.role !== 'admin' && !u.deleted_at && <button className={buttonClass} disabled={action.busy} onClick={() => void action.perform(async () => { await run(async () => { await checkedUpdate('profiles', { banned_at: u.banned_at ? null : new Date().toISOString(), ban_reason: u.banned_at ? null : 'Khóa bởi quản trị viên' }, 'id', u.id) }) })}>{u.banned_at ? 'Mở khóa' : 'Khóa tài khoản'}</button>}</td></tr>)}</tbody></table></div></Panel>
+>{acquisitionSources.map(source => <option key={source.value} value={source.value}>{source.label}</option>)}</select>}</td><td className="p-4">{u.role !== 'admin' && !u.deleted_at && <button className={buttonClass} style={{ whiteSpace: "nowrap" }} disabled={action.busy} onClick={() => void action.perform(async () => { await run(async () => { await checkedUpdate('profiles', { banned_at: u.banned_at ? null : new Date().toISOString(), ban_reason: u.banned_at ? null : 'Khóa bởi quản trị viên' }, 'id', u.id) }) })}>{u.banned_at ? 'Mở khóa' : 'Khóa tài khoản'}</button>}</td></tr>)}</tbody></table></div></Panel>
 }
 
 export function AdminApplications() {
@@ -611,14 +622,12 @@ export function Dashboard({ admin = false }: { admin?: boolean }) {
   const completed = bookings.filter(b => b.status === 'completed')
   const total = completed.reduce((s, b) => s + Number(b.package_price || 0), 0)
   const eligibleAccounts = admin ? users.filter(account => account.role !== 'admin' && !account.deleted_at) : []
-  const isDemo = (account: Row) =>
-    /^memento-demo-(?:\d{2}|[a-f0-9]{12}-\d{1,2}|50-v1-\d{2})@example\.invalid$/i.test(account.email?.trim() || '')
-  const accounts = eligibleAccounts.filter(account => !isDemo(account))
-  const demoAccounts = eligibleAccounts.filter(isDemo)
+  const accounts = eligibleAccounts.filter(account => !isDemoAccount(account))
+  const demoAccounts = eligibleAccounts.filter(isDemoAccount)
     .sort((a, b) => String(a.email).localeCompare(String(b.email)))
     .slice(0, 37)
-  const items = admin ? [['Tài khoản', accounts.length + demoAccounts.length], ['Nhiếp ảnh gia', photographers.length], ['Đơn đặt lịch', bookings.length], ['Chờ duyệt', applications.filter(a => a.status === 'submitted').length]] : [['Đơn đặt lịch', bookings.length], ['Chờ xác nhận', bookings.filter(b => b.status === 'pending').length], ['Hoàn thành', completed.length], [user?.role === 'photographer' ? 'Giá trị đơn hoàn thành' : 'Tổng giá trị đơn hoàn thành', money(total)]]
-  return <Panel title={`Xin chào, ${user?.name || 'bạn'}`}><div className="dashboard-metrics">{items.map(([label, value]) => <div key={label} className="bg-card border border-border rounded-2xl p-5"><p className="text-sm text-muted-foreground">{label}</p><p className="text-2xl text-primary font-bold mt-2">{value}</p></div>)}</div>{admin && <div className="dashboard-reports"><div className="min-w-0"><AnalyticsPanel /></div><AccountSources accounts={accounts} demoAccounts={demoAccounts} /></div>}
+  const items = admin ? [['Tài khoản (gồm demo)', accounts.length + demoAccounts.length], ['Nhiếp ảnh gia', photographers.length], ['Đơn đặt lịch', bookings.length], ['Chờ duyệt', applications.filter(a => a.status === 'submitted').length]] : [['Đơn đặt lịch', bookings.length], ['Chờ xác nhận', bookings.filter(b => b.status === 'pending').length], ['Hoàn thành', completed.length], [user?.role === 'photographer' ? 'Giá trị đơn hoàn thành' : 'Tổng giá trị đơn hoàn thành', money(total)]]
+  return <Panel title={`Xin chào, ${user?.name || 'bạn'}`}><div className="dashboard-metrics">{items.map(([label, value]) => <div key={label} className="bg-card border border-border rounded-2xl p-5"><p className="text-sm text-muted-foreground">{label}</p><p className="text-2xl text-primary font-bold mt-2">{value}</p></div>)}</div>{admin && <AdminStatistics />}{admin && <div className="dashboard-reports"><div className="min-w-0"><AnalyticsPanel /></div><AccountSources accounts={accounts} demoAccounts={demoAccounts} /></div>}
     <div className="bg-card border border-border rounded-2xl p-5"><h2 className="font-bold mb-3">Đặt lịch gần đây</h2>{!bookings.length && <p className="text-sm text-muted-foreground">Chưa có đặt lịch.</p>}{bookings.slice(0, 6).map(b => <div key={b.id} className="flex justify-between gap-3 py-3 border-b border-border last:border-0 text-sm"><span>{b.photographer_name} · {date(b.booking_date)}</span><span>{statusLabels[b.status] || b.status}</span></div>)}</div></Panel>
 }
 
