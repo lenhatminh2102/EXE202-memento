@@ -574,15 +574,14 @@ function HomePage({ navigate }: { navigate: Navigate }) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
           <div className="hidden md:block absolute top-12 left-1/3 right-1/3 h-px" style={{ backgroundColor: "#7EE6D8" }} />
           {[
-            { step: "01", icon: Search, title: "Tìm nhiếp ảnh gia", desc: "Lọc theo địa điểm, phong cách và ngân sách để tìm nhiếp ảnh gia phù hợp nhất với bạn." },
-            { step: "02", icon: Calendar, title: "Đặt lịch", desc: "Chọn gói dịch vụ, ngày giờ và điền thông tin sự kiện. Xác nhận chỉ trong vài giây." },
-            { step: "03", icon: Image, title: "Nhận ảnh đẹp", desc: "Nhiếp ảnh gia đến đúng giờ, chụp xuất sắc và giao ảnh đã chỉnh sửa đúng hẹn." },
+            { icon: Search, title: "Tìm nhiếp ảnh gia", desc: "Lọc theo địa điểm, phong cách và ngân sách để tìm nhiếp ảnh gia phù hợp nhất với bạn." },
+            { icon: Calendar, title: "Đặt lịch", desc: "Chọn gói dịch vụ, ngày giờ và điền thông tin sự kiện. Xác nhận chỉ trong vài giây." },
+            { icon: Image, title: "Nhận ảnh đẹp", desc: "Nhiếp ảnh gia đến đúng giờ, chụp xuất sắc và giao ảnh đã chỉnh sửa đúng hẹn." },
           ].map((s) => (
-            <div key={s.step} className="relative flex flex-col items-center text-center p-8">
+            <div key={s.title} className="relative flex flex-col items-center text-center p-8">
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 shadow-lg" style={{ backgroundColor: "#0F6D6A" }}>
                 <s.icon className="w-7 h-7 text-white" />
               </div>
-              <div className="absolute top-6 right-6 text-5xl font-black opacity-5 text-foreground">{s.step}</div>
               <h3 className="text-lg font-bold text-foreground mb-2">{s.title}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
             </div>
