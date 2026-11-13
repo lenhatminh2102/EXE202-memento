@@ -1,3 +1,4 @@
+import { maskContact } from './maskContact'
 import { useEffect, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useBackend } from './BackendContext'
@@ -137,7 +138,7 @@ export function AdminStatistics() {
         {group.size ? <div className="overflow-x-auto"><table className="w-full text-sm">
           <thead><tr><th className="text-left">Tên</th><th className="text-right">Số đơn</th><th className="text-right">Thanh toán</th></tr></thead>
           <tbody>{[...group].sort((a, b) => b[1].total - a[1].total).slice(0, 5).map(([id, entry]) => <tr key={id} className="border-t border-border">
-            <td className="py-3">{entry.name}</td><td className="text-right">{entry.orders.size}</td><td className="text-right">{currency.format(entry.total)}</td>
+            <td className="py-3">{maskContact(entry.name)}</td><td className="text-right">{entry.orders.size}</td><td className="text-right">{currency.format(entry.total)}</td>
           </tr>)}</tbody>
         </table></div> : <p className="text-sm text-muted-foreground">Chưa có thanh toán trong kỳ.</p>}
       </section>)}

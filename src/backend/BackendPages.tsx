@@ -1,3 +1,4 @@
+import { maskContact } from './maskContact'
 import { AdminStatistics, isDemoAccount } from './AdminStatistics'
 import { useEffect, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
@@ -365,7 +366,7 @@ export function BookingList({ admin = false, calendar = false }: { admin?: boole
     {!loading && !rows.length && <p className="rounded-2xl bg-card border border-border p-6 text-muted-foreground">Chưa có đặt lịch phù hợp.</p>}
     {rows.map(b => <article key={b.id} className="bg-card border border-border rounded-2xl p-5 space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-bold">{b.photographer_name}</p><p className="text-xs text-muted-foreground break-all">#{b.id}</p></div><span className="text-sm bg-secondary px-3 py-1 rounded-full">{statusLabels[b.status] || b.status}</span></div>
-      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground"><span>{date(b.booking_date)} · {b.start_time?.slice(0, 5)}–{b.end_time?.slice(0, 5)}</span><span>{b.package_name}</span>{admin && <span>Khách: {b.client_name || b.client_id}</span>}<strong className="text-primary">{money(Number(b.package_price))}</strong></div>
+      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground"><span>{date(b.booking_date)} · {b.start_time?.slice(0, 5)}–{b.end_time?.slice(0, 5)}</span><span>{b.package_name}</span>{admin && <span>Khách: {maskContact(b.client_name || '—')}</span>}<strong className="text-primary">{money(Number(b.package_price))}</strong></div>
       <button className={buttonClass} onClick={() => setSelected(selected === b.id ? null : b.id)}>{selected === b.id ? 'Thu gọn' : 'Chi tiết & thao tác'}</button>
       {selected === b.id && <BookingActions key={b.id} row={b} admin={admin && user?.role === 'admin'} />}
     </article>)}
@@ -537,17 +538,13 @@ export function AdminUsers() {
   const [search, setSearch] = useState('')
   const action = useAction()
   const sampleNames = ['Lê Anh Thư', 'Trần Minh Anh', 'Phạm Ngọc Linh', 'Nguyễn Thu Hà']
-  const sampleHandles = ['leanhthu', 'tranminhanh', 'phamngoclinh', 'nguyenthuha']
-  const displayUsers = users.map((account, index) => {
+  const displayUsers = users.map(account => {
     if (!isDemoAccount(account)) return account
-    return {
-      ...account,
-      full_name: sampleNames[index % sampleNames.length],
-      email: sampleHandles[index % sampleHandles.length] + String(1122 + index).padStart(6, '0') + '@gmail.com',
-    }
+    const index = [...String(account.id)].reduce((sum, character) => sum + character.charCodeAt(0), 0)
+    return { ...account, full_name: sampleNames[index % sampleNames.length], email: '••••@••••' }
   })
-  return <Panel title="Quản lý người dùng"><Message {...action} /><input className={inputClass} placeholder="Tìm tên hoặc email…" value={search} onChange={e => setSearch(e.target.value)} /><div className="bg-card border border-border rounded-2xl overflow-x-auto"><table className="w-full text-sm" style={{ minWidth: 820 }}><thead><tr>{['Người dùng', 'Email', 'Vai trò', 'Trạng thái', 'Nguồn đăng ký', 'Thao tác'].map(h => <th className="text-left p-4" key={h}>{h}</th>)}</tr></thead><tbody>{displayUsers.filter(u => `${u.full_name} ${u.email}`.toLowerCase().includes(search.toLowerCase())).map(u => <tr key={u.id} className="border-t border-border"><td className="p-4" style={{ overflowWrap: "anywhere" }}>{u.full_name || u.username || '—'}</td><td className="p-4" style={{ overflowWrap: "anywhere" }}>{u.email}</td><td className="p-4">{u.role}</td><td className="p-4">{u.deleted_at ? 'Đã xóa' : u.banned_at ? 'Đã khóa' : 'Hoạt động'}</td><td className="p-4">{u.role !== 'admin' && !u.deleted_at && <select
-  aria-label={`Nguồn đăng ký của ${u.full_name || u.email}`}
+  return <Panel title="Quản lý người dùng"><Message {...action} /><input className={inputClass} placeholder="Tìm tên hoặc email…" value={search} onChange={e => setSearch(e.target.value)} /><div className="bg-card border border-border rounded-2xl overflow-x-auto"><table className="w-full text-sm" style={{ minWidth: 820 }}><thead><tr>{['Người dùng', 'Email', 'Vai trò', 'Trạng thái', 'Nguồn đăng ký', 'Thao tác'].map(h => <th className="text-left p-4" key={h}>{h}</th>)}</tr></thead><tbody>{displayUsers.filter(u => `${u.full_name} ${u.email}`.toLowerCase().includes(search.toLowerCase())).map(u => <tr key={u.id} className="border-t border-border"><td className="p-4" style={{ overflowWrap: "anywhere" }}>{[u.full_name, u.username].find(name => typeof name === 'string' && name.trim() && !name.includes('@') && maskContact(name) === name) || 'Chưa đặt tên'}</td><td className="p-4" style={{ overflowWrap: "anywhere" }}>{maskContact(u.email || '—')}</td><td className="p-4">{u.role}</td><td className="p-4">{u.deleted_at ? 'Đã xóa' : u.banned_at ? 'Đã khóa' : 'Hoạt động'}</td><td className="p-4">{u.role !== 'admin' && !u.deleted_at && <select
+  aria-label={`Nguồn đăng ký của `}
   className={inputClass} style={{ minWidth: 140 }}
   value={u.acquisition_source || ''}
   disabled={action.busy}
@@ -573,13 +570,12 @@ export function AdminApplications() {
   }, approve ? 'Đã duyệt hồ sơ.' : 'Đã từ chối hồ sơ.')}>{approve ? 'Duyệt hồ sơ' : 'Từ chối'}</button>)}</div></article>)}</Panel>
 }
 
-function AccountSources({ accounts, demoAccounts }: { accounts: Row[]; demoAccounts: Row[] }) {
-  const displayedAccounts = [...accounts, ...demoAccounts]
-  const distributionTotal = displayedAccounts.length
+function AccountSources({ accounts }: { accounts: Row[] }) {
+  const distributionTotal = accounts.length
   const percentFormat = new Intl.NumberFormat('vi-VN', { style: 'percent', maximumFractionDigits: 1 })
   let offset = 0
   const distribution = acquisitionSources.map(source => {
-    const count = displayedAccounts.filter(account => (account.acquisition_source || '') === source.value).length
+    const count = accounts.filter(account => (account.acquisition_source || '') === source.value).length
     const share = distributionTotal ? count / distributionTotal : 0
     const start = offset
     offset += share * 100
@@ -590,7 +586,7 @@ function AccountSources({ accounts, demoAccounts }: { accounts: Row[]; demoAccou
     : '#e2e8f0'
   return <section className="min-w-0 space-y-4 rounded-2xl border border-border bg-card p-4 sm:p-6">
       <header>
-        <h2 className="text-lg font-bold">Nguồn đăng ký · Thử nghiệm</h2>
+        <h2 className="text-lg font-bold">Nguồn đăng ký</h2>
 
       </header>
       <div className="grid justify-items-center gap-4">
@@ -623,11 +619,8 @@ export function Dashboard({ admin = false }: { admin?: boolean }) {
   const total = completed.reduce((s, b) => s + Number(b.package_price || 0), 0)
   const eligibleAccounts = admin ? users.filter(account => account.role !== 'admin' && !account.deleted_at) : []
   const accounts = eligibleAccounts.filter(account => !isDemoAccount(account))
-  const demoAccounts = eligibleAccounts.filter(isDemoAccount)
-    .sort((a, b) => String(a.email).localeCompare(String(b.email)))
-    .slice(0, 37)
-  const items = admin ? [['Tài khoản (gồm demo)', accounts.length + demoAccounts.length], ['Nhiếp ảnh gia', photographers.length], ['Đơn đặt lịch', bookings.length], ['Chờ duyệt', applications.filter(a => a.status === 'submitted').length]] : [['Đơn đặt lịch', bookings.length], ['Chờ xác nhận', bookings.filter(b => b.status === 'pending').length], ['Hoàn thành', completed.length], [user?.role === 'photographer' ? 'Giá trị đơn hoàn thành' : 'Tổng giá trị đơn hoàn thành', money(total)]]
-  return <Panel title={`Xin chào, ${user?.name || 'bạn'}`}><div className="dashboard-metrics">{items.map(([label, value]) => <div key={label} className="bg-card border border-border rounded-2xl p-5"><p className="text-sm text-muted-foreground">{label}</p><p className="text-2xl text-primary font-bold mt-2">{value}</p></div>)}</div>{admin && <AdminStatistics />}{admin && <div className="dashboard-reports"><div className="min-w-0"><AnalyticsPanel /></div><AccountSources accounts={accounts} demoAccounts={demoAccounts} /></div>}
+  const items = admin ? [['Tài khoản', accounts.length], ['Nhiếp ảnh gia', photographers.length], ['Đơn đặt lịch', bookings.length], ['Chờ duyệt', applications.filter(a => a.status === 'submitted').length]] : [['Đơn đặt lịch', bookings.length], ['Chờ xác nhận', bookings.filter(b => b.status === 'pending').length], ['Hoàn thành', completed.length], [user?.role === 'photographer' ? 'Giá trị đơn hoàn thành' : 'Tổng giá trị đơn hoàn thành', money(total)]]
+  return <Panel title={`Xin chào, ${admin ? maskContact(user?.name || 'bạn') : user?.name || 'bạn'}`}><div className="dashboard-metrics">{items.map(([label, value]) => <div key={label} className="bg-card border border-border rounded-2xl p-5"><p className="text-sm text-muted-foreground">{label}</p><p className="text-2xl text-primary font-bold mt-2">{value}</p></div>)}</div>{admin && <AdminStatistics />}{admin && <div className="dashboard-reports"><div className="min-w-0"><AnalyticsPanel /></div><AccountSources accounts={accounts} /></div>}
     <div className="bg-card border border-border rounded-2xl p-5"><h2 className="font-bold mb-3">Đặt lịch gần đây</h2>{!bookings.length && <p className="text-sm text-muted-foreground">Chưa có đặt lịch.</p>}{bookings.slice(0, 6).map(b => <div key={b.id} className="flex justify-between gap-3 py-3 border-b border-border last:border-0 text-sm"><span>{b.photographer_name} · {date(b.booking_date)}</span><span>{statusLabels[b.status] || b.status}</span></div>)}</div></Panel>
 }
 
