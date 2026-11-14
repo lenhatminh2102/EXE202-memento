@@ -579,7 +579,7 @@ function AccountSources({ accounts }: { accounts: Row[] }) {
     const share = distributionTotal ? count / distributionTotal : 0
     const start = offset
     offset += share * 100
-    return { ...source, count, share, segment: `${source.chartColor} ${start}% ${offset}%` }
+    return { ...source, share, segment: `${source.chartColor} ${start}% ${offset}%` }
   })
   const chartBackground = distributionTotal
     ? `conic-gradient(${distribution.map(source => source.segment).join(', ')})`
@@ -590,10 +590,7 @@ function AccountSources({ accounts }: { accounts: Row[] }) {
 
       </header>
       <div className="grid justify-items-center gap-4">
-        <div aria-hidden="true" className="relative shrink-0" style={{ width: "min(168px, 100%)", aspectRatio: "1 / 1", borderRadius: "50%", background: chartBackground }}>
-          <div className="flex flex-col items-center justify-center bg-card" style={{ position: "absolute", inset: "13%", borderRadius: "50%" }}>
-          </div>
-        </div>
+        <div aria-hidden="true" className="relative shrink-0" style={{ width: "min(168px, 100%)", aspectRatio: "1 / 1", borderRadius: "50%", marginInline: "auto", background: chartBackground }} />
         <div className="dashboard-sources">
           {distribution.map(source => <div key={source.value} className="min-w-0 rounded-xl border border-border p-3">
             <div className="flex items-center gap-2 text-sm">
@@ -601,7 +598,6 @@ function AccountSources({ accounts }: { accounts: Row[] }) {
               <span>{source.label}</span>
             </div>
             <p className="mt-2 text-2xl font-bold tabular-nums">{percentFormat.format(source.share)}</p>
-            <p className="text-xs text-muted-foreground">{source.count} tài khoản</p>
           </div>)}
         </div>
       </div>
