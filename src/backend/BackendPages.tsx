@@ -592,8 +592,6 @@ function AccountSources({ accounts }: { accounts: Row[] }) {
       <div className="grid justify-items-center gap-4">
         <div aria-hidden="true" className="relative shrink-0" style={{ width: "min(168px, 100%)", aspectRatio: "1 / 1", borderRadius: "50%", background: chartBackground }}>
           <div className="flex flex-col items-center justify-center bg-card" style={{ position: "absolute", inset: "13%", borderRadius: "50%" }}>
-            <strong className="text-3xl tabular-nums">{distributionTotal}</strong>
-            <span className="text-xs text-muted-foreground">Tài khoản</span>
           </div>
         </div>
         <div className="dashboard-sources">
@@ -619,7 +617,7 @@ export function Dashboard({ admin = false }: { admin?: boolean }) {
   const total = completed.reduce((s, b) => s + Number(b.package_price || 0), 0)
   const eligibleAccounts = admin ? users.filter(account => account.role !== 'admin' && !account.deleted_at) : []
   const accounts = eligibleAccounts.filter(account => !isDemoAccount(account))
-  const items = admin ? [['Tài khoản', accounts.length], ['Nhiếp ảnh gia', photographers.length], ['Đơn đặt lịch', bookings.length], ['Chờ duyệt', applications.filter(a => a.status === 'submitted').length]] : [['Đơn đặt lịch', bookings.length], ['Chờ xác nhận', bookings.filter(b => b.status === 'pending').length], ['Hoàn thành', completed.length], [user?.role === 'photographer' ? 'Giá trị đơn hoàn thành' : 'Tổng giá trị đơn hoàn thành', money(total)]]
+  const items = admin ? [['Nhiếp ảnh gia', photographers.length], ['Đơn đặt lịch', bookings.length], ['Chờ duyệt', applications.filter(a => a.status === 'submitted').length]] : [['Đơn đặt lịch', bookings.length], ['Chờ xác nhận', bookings.filter(b => b.status === 'pending').length], ['Hoàn thành', completed.length], [user?.role === 'photographer' ? 'Giá trị đơn hoàn thành' : 'Tổng giá trị đơn hoàn thành', money(total)]]
   return <Panel title={`Xin chào, ${admin ? maskContact(user?.name || 'bạn') : user?.name || 'bạn'}`}><div className="dashboard-metrics">{items.map(([label, value]) => <div key={label} className="bg-card border border-border rounded-2xl p-5"><p className="text-sm text-muted-foreground">{label}</p><p className="text-2xl text-primary font-bold mt-2">{value}</p></div>)}</div>{admin && <AdminStatistics />}{admin && <div className="dashboard-reports"><div className="min-w-0"><AnalyticsPanel /></div><AccountSources accounts={accounts} /></div>}
     <div className="bg-card border border-border rounded-2xl p-5"><h2 className="font-bold mb-3">Đặt lịch gần đây</h2>{!bookings.length && <p className="text-sm text-muted-foreground">Chưa có đặt lịch.</p>}{bookings.slice(0, 6).map(b => <div key={b.id} className="flex justify-between gap-3 py-3 border-b border-border last:border-0 text-sm"><span>{b.photographer_name} · {date(b.booking_date)}</span><span>{statusLabels[b.status] || b.status}</span></div>)}</div></Panel>
 }

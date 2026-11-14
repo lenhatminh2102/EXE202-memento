@@ -45,7 +45,7 @@ export function AdminStatistics() {
   const today = Date.now()
   const daily = Array.from({ length: days }, (_, index) => {
     const key = day(new Date(today - (days - 1 - index) * 86400000))
-    return { key, label: key.slice(8) + '/' + key.slice(5, 7), paid: 0, commission: 0, transactions: 0, newUsers: 0, totalUsers: 0 }
+    return { key, label: key.slice(8) + '/' + key.slice(5, 7), paid: 0, commission: 0, transactions: 0, newUsers: 0 }
   })
   const byDay = new Map(daily.map(row => [row.key, row]))
   const dayOf = (value?: string) => value && Number.isFinite(Date.parse(value)) ? day(new Date(value)) : ''
@@ -54,14 +54,6 @@ export function AdminStatistics() {
     const key = dayOf(account.created_at)
     const row = byDay.get(key)
     if (row) row.newUsers++
-  }
-  let cumulative = accounts.filter(account => {
-    const key = dayOf(account.created_at)
-    return key && key < daily[0].key
-  }).length
-  for (const row of daily) {
-    cumulative += row.newUsers
-    row.totalUsers = cumulative
   }
   const orders = bookings.filter(order => byDay.has(dayOf(order.created_at)))
   const paidOrders = new Set<string>()
@@ -127,9 +119,8 @@ export function AdminStatistics() {
       <section className={card}><h3 className="mb-4 font-semibold">Phân bố điểm đánh giá</h3>{periodReviews ? bars([5, 4, 3, 2, 1].map(rating => [rating + ' sao', periodReviews.filter(review => Number(review.rating) === rating).length]), periodReviews.length) : <p>Chưa có dữ liệu.</p>}</section>
     </div>
     <h2 className="text-xl font-bold">Thống kê người dùng</h2>
-    {cards([['Tổng tài khoản', accounts.length], ['Khách hàng / Nhiếp ảnh gia', roles[0][1] + ' / ' + roles[1][1]], ['Đơn tạo trong kỳ có thanh toán trong kỳ', ratio(orders.filter(order => paidOrders.has(String(order.id))).length, orders.length) + '%'], ['Khách có từ 2 đơn thanh toán', ratio([...customers.values()].filter(entry => entry.orders.size >= 2).length, customers.size) + '%']])}
+    {cards([['Khách hàng / Nhiếp ảnh gia', roles[0][1] + ' / ' + roles[1][1]], ['Đơn tạo trong kỳ có thanh toán trong kỳ', ratio(orders.filter(order => paidOrders.has(String(order.id))).length, orders.length) + '%'], ['Khách có từ 2 đơn thanh toán', ratio([...customers.values()].filter(entry => entry.orders.size >= 2).length, customers.size) + '%']])}
     <div className="dashboard-reports">
-      <DailyChart title="Tăng trưởng tài khoản theo ngày" rows={daily} series={[[ 'totalUsers', 'Tổng tích lũy', '#16a34a']]} />
       <section className={card}><h3 className="mb-4 font-semibold">Phân bố vai trò</h3>{bars(roles, accounts.length)}</section>
     </div>
     <div className="grid gap-4 lg:grid-cols-2">
